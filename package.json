@@ -1,0 +1,15 @@
+{
+  "name": "clickpulse-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ClickPulse monorepo workspace",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm --workspace=@clickpulse/tracker run build",
+    "typecheck": "npm --workspaces run typecheck"
+  },
+  "author": "ClickPulse Contributors",
+  "license": "MIT"
+}

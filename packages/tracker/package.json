@@ -1,0 +1,27 @@
+{
+  "name": "@clickpulse/tracker",
+  "version": "0.1.0",
+  "description": "Lightweight (<1.5KB), cookieless web analytics tracker for ClickHouse & SigNoz",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup && mkdir -p ../../public && cp dist/tracker.min.js ../../public/ && cp dist/tracker.js ../../public/",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "analytics",
+    "web-analytics",
+    "clickhouse",
+    "signoz",
+    "cookieless",
+    "privacy-first",
+    "gdpr"
+  ],
+  "author": "ClickPulse Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.0.2",
+    "typescript": "^5.4.5"
+  }
+}

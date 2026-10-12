@@ -1,0 +1,35 @@
+name = "clickpulse-edge"
+main = "src/index.ts"
+compatibility_date = "2024-05-01"
+
+[vars]
+ALLOWED_ORIGINS = "*"
+SALT_SECRET = "change-this-to-a-secure-random-secret"
+
+# ------------------------------------------------------------------------------
+# Primary Mode: Protected Direct ClickHouse Ingestion (async_insert=1)
+# ------------------------------------------------------------------------------
+# Route via Cloudflare Zero Trust Tunnel:
+CLICKHOUSE_ENDPOINT = "https://clickhouse.yourdomain.com"
+CLICKHOUSE_USER = "clickpulse_worker"
+CLICKHOUSE_PASSWORD = "your-secure-sandboxed-password"
+CLICKHOUSE_DATABASE = "clickpulse"
+CLICKHOUSE_TABLE = "analytics_events"
+
+# Zero Trust Network Protection: Cloudflare Access Service Token (Optional but recommended)
+CF_ACCESS_CLIENT_ID = "your-service-token-id.access"
+CF_ACCESS_CLIENT_SECRET = "your-service-token-secret"
+
+# ------------------------------------------------------------------------------
+# Secondary / Shock Absorber Mode: Cloudflare D1 Spool (Spools on backend downtime)
+# ------------------------------------------------------------------------------
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "clickpulse-d1"
+# database_id = "your-d1-database-uuid"
+
+# ------------------------------------------------------------------------------
+# Alternative Mode: OpenTelemetry Collector (Optional)
+# ------------------------------------------------------------------------------
+# OTEL_EXPORTER_OTLP_ENDPOINT = "https://collector.yourdomain.com"
+# OTEL_AUTH_TOKEN = ""

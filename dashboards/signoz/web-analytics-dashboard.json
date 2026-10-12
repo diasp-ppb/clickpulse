@@ -1,0 +1,62 @@
+{
+  "title": "ClickPulse — Web Analytics",
+  "description": "Privacy-first, cookieless web analytics powered by ClickHouse & SigNoz",
+  "version": 1,
+  "widgets": [
+    {
+      "id": "kpi_visitors",
+      "title": "Unique Visitors (Today)",
+      "panelType": "value",
+      "query": "SELECT uniq(visitor_id) FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND toDate(created_at) = today()"
+    },
+    {
+      "id": "kpi_sessions",
+      "title": "Sessions (Today)",
+      "panelType": "value",
+      "query": "SELECT uniq(session_id) FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND toDate(created_at) = today()"
+    },
+    {
+      "id": "kpi_pageviews",
+      "title": "Pageviews (Today)",
+      "panelType": "value",
+      "query": "SELECT count() FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND toDate(created_at) = today()"
+    },
+    {
+      "id": "kpi_bounce_rate",
+      "title": "Bounce Rate % (7 Days)",
+      "panelType": "value",
+      "query": "SELECT round(countIf(hits = 1) * 100.0 / count(), 1) FROM (SELECT session_id, count() AS hits FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY session_id)"
+    },
+    {
+      "id": "timeseries_traffic",
+      "title": "Traffic Trends (Pageviews & Visitors)",
+      "panelType": "time_series",
+      "query": "SELECT toStartOfHour(created_at) AS time, count() AS pageviews, uniq(visitor_id) AS visitors FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY time ORDER BY time ASC"
+    },
+    {
+      "id": "table_top_pages",
+      "title": "Top Pages",
+      "panelType": "table",
+      "query": "SELECT path, count() AS pageviews, uniq(session_id) AS unique_sessions FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND created_at >= now() - INTERVAL 30 DAY GROUP BY path ORDER BY pageviews DESC LIMIT 15"
+    },
+    {
+      "id": "table_top_referrers",
+      "title": "Top Referrers & Channels",
+      "panelType": "table",
+      "query": "SELECT CASE WHEN referrer = '' OR referrer IS NULL THEN 'Direct / None' WHEN referrer ILIKE '%google%' THEN 'Google Search' WHEN referrer ILIKE '%github%' THEN 'GitHub' WHEN referrer ILIKE '%reddit%' THEN 'Reddit' WHEN referrer ILIKE '%ycombinator%' THEN 'Hacker News' ELSE cutURL(referrer) END AS channel, uniq(session_id) AS sessions FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND created_at >= now() - INTERVAL 30 DAY GROUP BY channel ORDER BY sessions DESC LIMIT 15"
+    },
+    {
+      "id": "table_outbound_conversions",
+      "title": "Top Outbound & Affiliate Clicks",
+      "panelType": "table",
+      "query": "SELECT JSONExtractString(event_data, 'title') AS target_title, JSONExtractString(event_data, 'url') AS target_url, count() AS clicks FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'outbound_click' AND created_at >= now() - INTERVAL 30 DAY GROUP BY target_title, target_url ORDER BY clicks DESC LIMIT 15"
+    }
+  ],
+  "variables": [
+    {
+      "name": "site_id",
+      "query": "SELECT DISTINCT site_id FROM clickpulse.analytics_events ORDER BY site_id ASC",
+      "defaultValue": "example.com"
+    }
+  ]
+}

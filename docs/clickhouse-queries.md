@@ -1,0 +1,195 @@
+# ClickPulse Analytical Queries Cookbook
+
+This guide contains production-tested ClickHouse queries for calculating all key web analytics metrics from the `clickpulse.analytics_events` table.
+
+---
+
+## 1. High-Level KPI Summary (Last 30 Days)
+
+```sql
+SELECT
+    uniq(visitor_id) AS unique_visitors,
+    uniq(session_id) AS total_sessions,
+    count() AS total_pageviews,
+    round(count() / uniq(session_id), 2) AS pages_per_session,
+    round(
+        countIf(page_count = 1) * 100.0 / count(),
+        2
+    ) AS bounce_rate_percentage
+FROM
+(
+    SELECT
+        visitor_id,
+        session_id,
+        count() AS page_count
+    FROM clickpulse.analytics_events
+    WHERE site_id = 'example.com'
+      AND event_type = 'pageview'
+      AND created_at >= now() - INTERVAL 30 DAY
+    GROUP BY visitor_id, session_id
+);
+```
+
+---
+
+## 2. Daily Time Series (Visitors, Sessions, Pageviews)
+
+```sql
+SELECT
+    toDate(created_at) AS date,
+    uniq(visitor_id) AS unique_visitors,
+    uniq(session_id) AS sessions,
+    count() AS pageviews
+FROM clickpulse.analytics_events
+WHERE site_id = 'example.com'
+  AND event_type = 'pageview'
+  AND created_at >= now() - INTERVAL 30 DAY
+GROUP BY date
+ORDER BY date ASC;
+```
+
+---
+
+## 3. Top Pages by Views & Average Time on Page
+
+```sql
+SELECT
+    path,
+    count() AS pageviews,
+    uniq(session_id) AS unique_sessions,
+    round(count() * 100.0 / sum(count()) OVER (), 2) AS share_pct
+FROM clickpulse.analytics_events
+WHERE site_id = 'example.com'
+  AND event_type = 'pageview'
+  AND created_at >= now() - INTERVAL 30 DAY
+GROUP BY path
+ORDER BY pageviews DESC
+LIMIT 20;
+```
+
+---
+
+## 4. Top Referrers & Channels
+
+```sql
+SELECT
+    CASE
+        WHEN referrer = '' OR referrer IS NULL THEN 'Direct / None'
+        WHEN referrer ILIKE '%google%' THEN 'Google Search'
+        WHEN referrer ILIKE '%bing%' THEN 'Bing Search'
+        WHEN referrer ILIKE '%github%' THEN 'GitHub'
+        WHEN referrer ILIKE '%news.ycombinator.com%' THEN 'Hacker News'
+        WHEN referrer ILIKE '%reddit%' THEN 'Reddit'
+        WHEN referrer ILIKE '%t.co%' OR referrer ILIKE '%twitter%' OR referrer ILIKE '%x.com%' THEN 'Twitter / X'
+        WHEN referrer ILIKE '%linkedin%' THEN 'LinkedIn'
+        ELSE cutURL(referrer)
+    END AS channel,
+    count() AS pageviews,
+    uniq(session_id) AS sessions
+FROM clickpulse.analytics_events
+WHERE site_id = 'example.com'
+  AND event_type = 'pageview'
+  AND created_at >= now() - INTERVAL 30 DAY
+GROUP BY channel
+ORDER BY sessions DESC
+LIMIT 20;
+```
+
+---
+
+## 5. UTM Campaign Performance
+
+```sql
+SELECT
+    utm_source,
+    utm_medium,
+    utm_campaign,
+    uniq(visitor_id) AS unique_visitors,
+    uniq(session_id) AS sessions,
+    count() AS pageviews
+FROM clickpulse.analytics_events
+WHERE site_id = 'example.com'
+  AND event_type = 'pageview'
+  AND utm_source != ''
+  AND created_at >= now() - INTERVAL 30 DAY
+GROUP BY utm_source, utm_medium, utm_campaign
+ORDER BY sessions DESC
+LIMIT 25;
+```
+
+---
+
+## 6. Geographic Distribution (Top Countries)
+
+```sql
+SELECT
+    country,
+    uniq(visitor_id) AS unique_visitors,
+    uniq(session_id) AS sessions,
+    count() AS pageviews
+FROM clickpulse.analytics_events
+WHERE site_id = 'example.com'
+  AND event_type = 'pageview'
+  AND created_at >= now() - INTERVAL 30 DAY
+GROUP BY country
+ORDER BY unique_visitors DESC
+LIMIT 25;
+```
+
+---
+
+## 7. Devices & Browsers Breakdown
+
+```sql
+SELECT
+    device_type,
+    browser,
+    uniq(visitor_id) AS unique_visitors,
+    round(uniq(visitor_id) * 100.0 / sum(uniq(visitor_id)) OVER (), 2) AS percentage
+FROM clickpulse.analytics_events
+WHERE site_id = 'example.com'
+  AND event_type = 'pageview'
+  AND created_at >= now() - INTERVAL 30 DAY
+GROUP BY device_type, browser
+ORDER BY unique_visitors DESC;
+```
+
+---
+
+## 8. Outbound Clicks & Conversion Tracking
+
+```sql
+SELECT
+    JSONExtractString(event_data, 'title') AS link_title,
+    JSONExtractString(event_data, 'url') AS target_url,
+    count() AS total_clicks,
+    uniq(session_id) AS unique_sessions
+FROM clickpulse.analytics_events
+WHERE site_id = 'example.com'
+  AND event_type = 'outbound_click'
+  AND created_at >= now() - INTERVAL 30 DAY
+GROUP BY link_title, target_url
+ORDER BY total_clicks DESC
+LIMIT 25;
+```
+
+---
+
+## 9. Average Session Duration
+
+```sql
+SELECT
+    round(avg(session_duration_seconds), 1) AS avg_duration_sec,
+    round(median(session_duration_seconds), 1) AS median_duration_sec
+FROM
+(
+    SELECT
+        session_id,
+        dateDiff('second', min(created_at), max(created_at)) AS session_duration_seconds
+    FROM clickpulse.analytics_events
+    WHERE site_id = 'example.com'
+      AND created_at >= now() - INTERVAL 30 DAY
+    GROUP BY session_id
+    HAVING count() > 1 -- Exclude 1-hit bounce sessions for accurate duration
+);
+```

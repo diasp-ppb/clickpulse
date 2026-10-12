@@ -1,0 +1,91 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Unique Visitors",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT uniq(visitor_id) FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "title": "Sessions",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT uniq(session_id) FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "title": "Pageviews",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT count() FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "title": "Bounce Rate %",
+      "type": "stat",
+      "targets": [
+        {
+          "rawSql": "SELECT round(countIf(hits = 1) * 100.0 / count(), 1) FROM (SELECT session_id, count() AS hits FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at) GROUP BY session_id)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "id": 5,
+      "title": "Traffic Trends",
+      "type": "timeseries",
+      "targets": [
+        {
+          "rawSql": "SELECT $__timeInterval(created_at) AS time, count() AS pageviews, uniq(visitor_id) AS visitors FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at) GROUP BY time ORDER BY time",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38,
+  "tags": ["clickpulse", "clickhouse", "analytics"],
+  "templating": {
+    "list": [
+      {
+        "current": { "text": "example.com", "value": "example.com" },
+        "name": "site_id",
+        "query": "SELECT DISTINCT site_id FROM clickpulse.analytics_events ORDER BY site_id",
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-7d", "to": "now" },
+  "title": "ClickPulse — Web Analytics",
+  "uid": "clickpulse-overview"
+}
