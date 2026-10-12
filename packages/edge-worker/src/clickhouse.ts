@@ -26,10 +26,10 @@ export async function sendDirectToClickHouse(
   const table = config.table || "analytics_events";
   const timeoutMs = config.timeoutMs || 800; // 800ms fast failover
 
-  const url = `${config.endpoint.replace(/\/$/, "")}/?query=INSERT+INTO+${db}.${table}+FORMAT+JSONEachRow&async_insert=1&wait_for_async_insert=0`;
+  const url = `${config.endpoint.replace(/\/$/, "")}/?query=INSERT+INTO+${db}.${table}+FORMAT+JSONEachRow&async_insert=1&wait_for_async_insert=0&date_time_input_format=best_effort`;
 
   const row = {
-    created_at: new Date(event.ts).toISOString(),
+    created_at: new Date(event.ts).toISOString().replace("T", " ").replace("Z", ""),
     site_id: event.site_id,
     event_type: event.event,
     visitor_id: visitorId,

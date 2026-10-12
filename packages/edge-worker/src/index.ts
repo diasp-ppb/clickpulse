@@ -60,7 +60,24 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
-    // 2. Enforce POST method only
+    // 2. Health check / service status endpoint for GET requests
+    if (request.method === "GET") {
+      const url = new URL(request.url);
+      return new Response(
+        JSON.stringify({
+          status: "healthy",
+          service: "clickpulse-edge",
+          destination: env.CLICKHOUSE_ENDPOINT ? "clickhouse" : env.DB ? "d1" : "unconfigured",
+          path: url.pathname
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders }
+        }
+      );
+    }
+
+    // 3. Enforce POST method for event ingestion
     if (request.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
@@ -132,12 +149,17 @@ export default {
 
           if (chResp.ok) {
             ingested = true;
-          } else if (env.DB) {
-            console.warn(`ClickHouse returned HTTP ${chResp.status}. Spooling to D1 buffer.`);
-            await bufferToD1(env.DB, event, visitorId);
-            ingested = true;
+          } else {
+            const errText = await chResp.text().catch(() => "");
+            console.error(`ClickHouse push failed (HTTP ${chResp.status}):`, errText);
+            if (env.DB) {
+              console.warn(`ClickHouse returned HTTP ${chResp.status}. Spooling to D1 buffer.`);
+              await bufferToD1(env.DB, event, visitorId);
+              ingested = true;
+            }
           }
         } catch (chErr: any) {
+          console.error("ClickHouse connection error:", chErr.message);
           if (env.DB) {
             console.warn(`Failed direct ClickHouse push: ${chErr.message}. Spooling to D1 buffer.`);
             await bufferToD1(env.DB, event, visitorId);

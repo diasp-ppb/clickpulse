@@ -2,9 +2,16 @@ name = "clickpulse-edge"
 main = "src/index.ts"
 compatibility_date = "2024-05-01"
 
+# ------------------------------------------------------------------------------
+# Inbound Destination (Custom Domain / Worker Route):
+# Directs public browser traffic (e.g. analytics.yourdomain.com) to this Edge Worker.
+# ------------------------------------------------------------------------------
+# routes = [
+#   { pattern = "analytics.yourdomain.com", custom_domain = true }
+# ]
+
 [vars]
 ALLOWED_ORIGINS = "*"
-SALT_SECRET = "change-this-to-a-secure-random-secret"
 
 # ------------------------------------------------------------------------------
 # Primary Mode: Protected Direct ClickHouse Ingestion (async_insert=1)
@@ -12,13 +19,12 @@ SALT_SECRET = "change-this-to-a-secure-random-secret"
 # Route via Cloudflare Zero Trust Tunnel:
 CLICKHOUSE_ENDPOINT = "https://clickhouse.yourdomain.com"
 CLICKHOUSE_USER = "clickpulse_worker"
-CLICKHOUSE_PASSWORD = "your-secure-sandboxed-password"
 CLICKHOUSE_DATABASE = "clickpulse"
 CLICKHOUSE_TABLE = "analytics_events"
 
 # Zero Trust Network Protection: Cloudflare Access Service Token (Optional but recommended)
-CF_ACCESS_CLIENT_ID = "your-service-token-id.access"
-CF_ACCESS_CLIENT_SECRET = "your-service-token-secret"
+# CF_ACCESS_CLIENT_ID = "your-service-token-id.access"
+# CF_ACCESS_CLIENT_SECRET = "your-service-token-secret"
 
 # ------------------------------------------------------------------------------
 # Secondary / Shock Absorber Mode: Cloudflare D1 Spool (Spools on backend downtime)
