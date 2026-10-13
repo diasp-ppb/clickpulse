@@ -43,7 +43,7 @@
       "id": "table_top_referrers",
       "title": "Top Referrers & Channels",
       "panelType": "table",
-      "query": "SELECT CASE WHEN referrer = '' OR referrer IS NULL THEN 'Direct / None' WHEN referrer ILIKE '%google%' THEN 'Google Search' WHEN referrer ILIKE '%github%' THEN 'GitHub' WHEN referrer ILIKE '%reddit%' THEN 'Reddit' WHEN referrer ILIKE '%ycombinator%' THEN 'Hacker News' ELSE cutURL(referrer) END AS channel, uniq(session_id) AS sessions FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND created_at >= now() - INTERVAL 30 DAY GROUP BY channel ORDER BY sessions DESC LIMIT 15"
+      "query": "SELECT CASE WHEN referrer = '' OR referrer IS NULL THEN 'Direct / None' WHEN referrer ILIKE '%google%' THEN 'Google Search' WHEN referrer ILIKE '%github%' THEN 'GitHub' WHEN referrer ILIKE '%reddit%' THEN 'Reddit' WHEN referrer ILIKE '%ycombinator%' THEN 'Hacker News' ELSE ifNull(domainWithoutWWW(referrer), referrer) END AS channel, uniq(session_id) AS sessions FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'pageview' AND created_at >= now() - INTERVAL 30 DAY GROUP BY channel ORDER BY sessions DESC LIMIT 15"
     },
     {
       "id": "table_outbound_conversions",

@@ -82,7 +82,7 @@ SELECT
         WHEN referrer ILIKE '%reddit%' THEN 'Reddit'
         WHEN referrer ILIKE '%t.co%' OR referrer ILIKE '%twitter%' OR referrer ILIKE '%x.com%' THEN 'Twitter / X'
         WHEN referrer ILIKE '%linkedin%' THEN 'LinkedIn'
-        ELSE cutURL(referrer)
+        ELSE ifNull(domainWithoutWWW(referrer), referrer)
     END AS channel,
     count() AS pageviews,
     uniq(session_id) AS sessions
