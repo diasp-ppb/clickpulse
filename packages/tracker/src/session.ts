@@ -5,49 +5,47 @@
  * Automatically rotates session IDs on 30 minutes of user inactivity or tab close.
  */
 
-const SESSION_STORAGE_KEY = "_cp_sid";
-const ACTIVITY_STORAGE_KEY = "_cp_act";
-const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const KEY_SID = "_cp_sid";
+const KEY_ACT = "_cp_act";
+const DEFAULT_TIMEOUT_MS = 18e5; // 30 minutes
 
 export interface SessionInfo {
   sessionId: string;
   isNewSession: boolean;
 }
 
+let memSid: string | undefined;
+
 export function getOrCreateSessionId(timeoutMs: number = DEFAULT_TIMEOUT_MS): SessionInfo {
-  const now = Date.now();
-  let isNewSession = false;
-
   try {
-    const existingSession = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-    const lastActiveStr = window.sessionStorage.getItem(ACTIVITY_STORAGE_KEY);
-    const lastActive = lastActiveStr ? parseInt(lastActiveStr, 10) : 0;
+    const s = sessionStorage;
+    const now = Date.now();
+    const lastActive = +(s.getItem(KEY_ACT) || 0);
+    const sid = s.getItem(KEY_SID);
 
-    // Check if session exists and is still active within timeout window
-    if (existingSession && lastActive && now - lastActive <= timeoutMs) {
-      window.sessionStorage.setItem(ACTIVITY_STORAGE_KEY, now.toString());
-      return { sessionId: existingSession, isNewSession: false };
+    if (sid && lastActive && now - lastActive <= timeoutMs) {
+      s.setItem(KEY_ACT, `${now}`);
+      return { sessionId: sid, isNewSession: false };
     }
 
-    // Otherwise, generate a fresh session ID
-    isNewSession = true;
-    const newSessionId = generateUUID();
-    window.sessionStorage.setItem(SESSION_STORAGE_KEY, newSessionId);
-    window.sessionStorage.setItem(ACTIVITY_STORAGE_KEY, now.toString());
-    return { sessionId: newSessionId, isNewSession: true };
+    const newSid = generateUUID();
+    s.setItem(KEY_SID, newSid);
+    s.setItem(KEY_ACT, `${now}`);
+    return { sessionId: newSid, isNewSession: true };
   } catch {
-    // Fallback if sessionStorage is disabled or blocked
-    return { sessionId: generateUUID(), isNewSession: true };
+    if (!memSid) {
+      memSid = generateUUID();
+      return { sessionId: memSid, isNewSession: true };
+    }
+    return { sessionId: memSid, isNewSession: false };
   }
 }
 
 function generateUUID(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+        (+c ^ ((Math.random() * 16) >> (+c / 4))).toString(16)
+      );
 }
+

@@ -16,7 +16,22 @@ export default defineConfig([
     entry: { "tracker.min": "src/index.ts" },
     format: ["iife"],
     globalName: "ClickPulse",
-    minify: true,
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        passes: 3,
+        unsafe: true,
+        unsafe_arrows: true,
+        pure_getters: true
+      },
+      mangle: {
+        toplevel: true,
+        reserved: ["ClickPulse"]
+      },
+      format: {
+        comments: false
+      }
+    },
     sourcemap: false,
     treeshake: true,
     outExtension() {

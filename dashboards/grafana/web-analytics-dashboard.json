@@ -71,6 +71,19 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "id": 6,
+      "title": "Top Landing Pages (Session Starts)",
+      "type": "table",
+      "targets": [
+        {
+          "rawSql": "SELECT path AS landing_page, count() AS session_starts, uniq(session_id) AS unique_sessions FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND JSONExtractBool(event_data, 'is_new_session') = 1 AND $__timeFilter(created_at) GROUP BY path ORDER BY session_starts DESC LIMIT 15",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "schemaVersion": 38,

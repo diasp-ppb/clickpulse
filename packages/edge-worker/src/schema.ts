@@ -21,6 +21,7 @@ export interface ValidatedEvent {
 const ALLOWED_EVENT_TYPES = new Set([
   "pageview",
   "outbound_click",
+  "session_start",
   "search",
   "signup",
   "conversion"

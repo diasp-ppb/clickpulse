@@ -193,3 +193,21 @@ FROM
     HAVING count() > 1 -- Exclude 1-hit bounce sessions for accurate duration
 );
 ```
+
+---
+
+## 10. Top Landing Pages (Session Starts / Entry Pages)
+
+```sql
+SELECT
+    path AS landing_page,
+    count() AS session_starts,
+    uniq(session_id) AS unique_sessions
+FROM clickpulse.analytics_events
+WHERE site_id = 'example.com'
+  AND JSONExtractBool(event_data, 'is_new_session') = 1
+  AND created_at >= now() - INTERVAL 30 DAY
+GROUP BY landing_page
+ORDER BY session_starts DESC
+LIMIT 20;
+```

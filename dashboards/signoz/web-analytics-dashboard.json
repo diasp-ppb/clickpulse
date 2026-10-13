@@ -50,6 +50,12 @@
       "title": "Top Outbound & Affiliate Clicks",
       "panelType": "table",
       "query": "SELECT JSONExtractString(event_data, 'title') AS target_title, JSONExtractString(event_data, 'url') AS target_url, count() AS clicks FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND event_type = 'outbound_click' AND created_at >= now() - INTERVAL 30 DAY GROUP BY target_title, target_url ORDER BY clicks DESC LIMIT 15"
+    },
+    {
+      "id": "table_landing_pages",
+      "title": "Top Landing Pages (Session Starts)",
+      "panelType": "table",
+      "query": "SELECT path AS landing_page, count() AS session_starts, uniq(session_id) AS unique_sessions FROM clickpulse.analytics_events WHERE site_id = '{{site_id}}' AND JSONExtractBool(event_data, 'is_new_session') = 1 AND created_at >= now() - INTERVAL 30 DAY GROUP BY landing_page ORDER BY session_starts DESC LIMIT 15"
     }
   ],
   "variables": [

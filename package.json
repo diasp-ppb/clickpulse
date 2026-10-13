@@ -8,8 +8,16 @@
   ],
   "scripts": {
     "build": "npm --workspace=@clickpulse/tracker run build",
-    "typecheck": "npm --workspaces run typecheck"
+    "typecheck": "npm --workspaces run typecheck",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest"
   },
   "author": "ClickPulse Contributors",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.4",
+    "happy-dom": "^21.0.1",
+    "vitest": "^5.0.4"
+  }
 }

@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsup && mkdir -p ../../public && cp dist/tracker.min.js ../../public/ && cp dist/tracker.js ../../public/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "keywords": [
     "analytics",
@@ -21,6 +22,7 @@
   "author": "ClickPulse Contributors",
   "license": "MIT",
   "devDependencies": {
+    "terser": "^5.51.2",
     "tsup": "^8.0.2",
     "typescript": "^5.4.5"
   }

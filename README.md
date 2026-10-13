@@ -94,6 +94,7 @@ ClickPulse implements a **Hybrid Privacy Architecture**:
 ### 1. Client-Side: Ephemeral Session Management
 - On initial page load, the tracker generates a random UUID (`crypto.randomUUID()`) and saves it in `sessionStorage`.
 - It tracks a rolling 30-minute inactivity timer. If a user remains inactive for > 30 minutes, a fresh `session_id` is generated.
+- **New Session Attribution:** The initial event of each session (e.g., first `pageview` on landing or after session expiry) automatically flags `{ is_new_session: true }` in `event_data`, unlocking entry/landing page metrics without extra HTTP network requests.
 - When the visitor closes the browser tab, `sessionStorage` is permanently wiped by the browser.
 - **Why this needs no cookie banner:** Under GDPR and the ePrivacy Directive, temporary technical tokens stored in `sessionStorage` strictly used for first-party aggregated measurement are exempt from consent requirements.
 
@@ -115,7 +116,7 @@ Public analytics endpoints are vulnerable to spam, bot traffic, and cardinality 
    - **In-Handler Protection (Always Active):** The ingestion code itself enforces request size limits (`Content-Length < 4 KB`), `POST`-only methods, and strict `Origin` header matching against configured allowed domains for the `site_id`.
    - **Rate Limiting:** In-memory or KV-backed rate limiting per IP and per `site_id` (e.g., max 60 requests/minute).
 2. **Strict Schema & Payload Validation:**
-   - Strict allowlist of `event_type` (`pageview`, `outbound_click`, `custom:*`). Any unrecognized events are dropped or flagged.
+   - Strict allowlist of `event_type` (`pageview`, `outbound_click`, `session_start`, `custom:*`). Any unrecognized events are dropped or flagged.
    - Maximum path length (255 chars), maximum 10 custom properties with depth 1.
    - Rejection of client timestamps differing by > ±5 minutes from server clock (preventing back-dated spam).
    - Bot filtering based on headless User-Agents, missing browser headers, or edge bot scores.
@@ -306,6 +307,7 @@ clickpulse/
 ### Milestones
 - [x] Architectural specification & RFC definition
 - [x] Modularize browser tracker (`@clickpulse/tracker`) with TypeScript (< 1.5 KB gzipped)
+- [x] Comprehensive test suites with Vitest & Happy-DOM for tracker SDK and edge worker
 - [x] Protected Direct ClickHouse ingestion (`async_insert=1`) with 3-shield defense
 - [x] Cloudflare D1 shock absorber spool for 100% zero data loss during server outages
 - [x] Optional OpenTelemetry Semantic Conventions for Events (`/v1/logs`)

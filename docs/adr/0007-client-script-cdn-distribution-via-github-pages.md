@@ -25,7 +25,7 @@ We adopt **GitHub Pages** as the primary, automated CDN distribution mechanism f
 
 ### 1. Delivery Architecture
 - Standalone tracker builds are generated into the [`public/`](../../public/) directory:
-  - `tracker.min.js` (2.9 KB uncompressed / 1.35 KB gzipped, minified IIFE).
+  - `tracker.min.js` (2.5 KB uncompressed / 1.25 KB gzipped, minified IIFE).
   - `tracker.js` (unminified with source maps for local debugging).
 - GitHub Pages serves the directory directly from:
   ```
