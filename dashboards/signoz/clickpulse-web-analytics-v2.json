@@ -1,0 +1,670 @@
+{
+  "metadata": {
+    "image": "",
+    "schemaVersion": "v6"
+  },
+  "spec": {
+    "display": {
+      "description": "Lightweight, cookieless web analytics powered by ClickHouse & SigNoz for itspedrodias.com and personal properties.",
+      "name": "ClickPulse \u2014 Web Analytics"
+    },
+    "duration": "7d",
+    "variables": [
+      {
+        "kind": "ListVariable",
+        "spec": {
+          "allowAllValue": true,
+          "allowMultiple": true,
+          "capturingRegexp": "",
+          "customAllValue": "",
+          "defaultValue": "itspedrodias.com",
+          "display": {
+            "description": "Filter by tracked website property",
+            "name": "Site ID"
+          },
+          "name": "site_id",
+          "plugin": {
+            "kind": "signoz/QueryVariable",
+            "spec": {
+              "queryValue": "SELECT DISTINCT site_id FROM clickpulse.analytics_events ORDER BY site_id ASC"
+            }
+          },
+          "sort": "alphabetical-asc"
+        }
+      }
+    ],
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "items": [
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-kpi-visitors"
+              },
+              "height": 4,
+              "width": 3,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-kpi-sessions"
+              },
+              "height": 4,
+              "width": 3,
+              "x": 3,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-kpi-pageviews"
+              },
+              "height": 4,
+              "width": 3,
+              "x": 6,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-kpi-bounce-rate"
+              },
+              "height": 4,
+              "width": 3,
+              "x": 9,
+              "y": 0
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-ts-traffic"
+              },
+              "height": 8,
+              "width": 8,
+              "x": 0,
+              "y": 4
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-pie-channels"
+              },
+              "height": 8,
+              "width": 4,
+              "x": 8,
+              "y": 4
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-table-pages"
+              },
+              "height": 8,
+              "width": 8,
+              "x": 0,
+              "y": 12
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-pie-devices"
+              },
+              "height": 8,
+              "width": 4,
+              "x": 8,
+              "y": 12
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-table-outbound"
+              },
+              "height": 8,
+              "width": 7,
+              "x": 0,
+              "y": 20
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/panel-table-countries"
+              },
+              "height": 8,
+              "width": 5,
+              "x": 7,
+              "y": 20
+            }
+          ]
+        }
+      }
+    ],
+    "links": [],
+    "panels": {
+      "panel-kpi-visitors": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Unique daily cryptographic visitor hashes",
+            "name": "Unique Visitors"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/NumberPanel",
+            "spec": {
+              "formatting": {
+                "decimalPrecision": "0",
+                "unit": "none"
+              },
+              "thresholds": [
+                {
+                  "color": "Green",
+                  "format": "text",
+                  "operator": "above",
+                  "unit": "none",
+                  "value": 0
+                }
+              ],
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT uniq(visitor_id) AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview'",
+                          "disabled": false,
+                          "legend": "Visitors"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-kpi-sessions": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Ephemeral 30-minute rolling sessions",
+            "name": "Sessions"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/NumberPanel",
+            "spec": {
+              "formatting": {
+                "decimalPrecision": "0",
+                "unit": "none"
+              },
+              "thresholds": [
+                {
+                  "color": "Blue",
+                  "format": "text",
+                  "operator": "above",
+                  "unit": "none",
+                  "value": 0
+                }
+              ],
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT uniq(session_id) AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview'",
+                          "disabled": false,
+                          "legend": "Sessions"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-kpi-pageviews": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Total article and page visits",
+            "name": "Pageviews"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/NumberPanel",
+            "spec": {
+              "formatting": {
+                "decimalPrecision": "0",
+                "unit": "none"
+              },
+              "thresholds": [
+                {
+                  "color": "Purple",
+                  "format": "text",
+                  "operator": "above",
+                  "unit": "none",
+                  "value": 0
+                }
+              ],
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT count() AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview'",
+                          "disabled": false,
+                          "legend": "Pageviews"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-kpi-bounce-rate": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Percentage of single-page sessions",
+            "name": "Bounce Rate %"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/NumberPanel",
+            "spec": {
+              "formatting": {
+                "decimalPrecision": "1",
+                "unit": "%"
+              },
+              "thresholds": [
+                {
+                  "color": "Orange",
+                  "format": "text",
+                  "operator": "above",
+                  "unit": "%",
+                  "value": 70
+                }
+              ],
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT ifNull(round(countIf(hits = 1) * 100.0 / nullIf(count(), 0), 1), 0) AS value, now() AS ts FROM (SELECT session_id, count() AS hits FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY session_id)",
+                          "disabled": false,
+                          "legend": "Bounce Rate"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-ts-traffic": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Hourly pageviews and unique visitors over time",
+            "name": "Traffic Trends"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TimeSeriesPanel",
+            "spec": {
+              "axes": {
+                "isLogScale": false,
+                "softMax": 0,
+                "softMin": 0
+              },
+              "chartAppearance": {
+                "fillMode": "gradient",
+                "lineInterpolation": "spline",
+                "lineStyle": "solid",
+                "showPoints": false,
+                "spanGaps": {
+                  "fillLessThan": "",
+                  "fillOnlyBelow": false
+                }
+              },
+              "formatting": {
+                "decimalPrecision": "0",
+                "unit": "none"
+              },
+              "legend": {
+                "customColors": null,
+                "mode": "table",
+                "position": "bottom"
+              },
+              "thresholds": [],
+              "visualization": {
+                "fillSpans": false,
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "time_series",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT toStartOfHour(created_at) AS ts, toFloat64(count()) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY ts ORDER BY ts ASC",
+                          "disabled": false,
+                          "legend": "Pageviews"
+                        }
+                      },
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "B",
+                          "query": "SELECT toStartOfHour(created_at) AS ts, toFloat64(uniq(visitor_id)) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY ts ORDER BY ts ASC",
+                          "disabled": false,
+                          "legend": "Unique Visitors"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-pie-channels": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Acquisition channels and referring websites",
+            "name": "Referrers & Channels"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/PieChartPanel",
+            "spec": {
+              "formatting": {
+                "decimalPrecision": "0",
+                "unit": ""
+              },
+              "legend": {
+                "customColors": null,
+                "mode": "table",
+                "position": "bottom"
+              },
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT CASE WHEN referrer = '' OR referrer IS NULL THEN 'Direct / None' WHEN referrer ILIKE '%google%' THEN 'Google Search' WHEN referrer ILIKE '%github%' THEN 'GitHub' WHEN referrer ILIKE '%reddit%' THEN 'Reddit' WHEN referrer ILIKE '%ycombinator%' THEN 'Hacker News' WHEN referrer ILIKE '%twitter%' OR referrer ILIKE '%t.co%' OR referrer ILIKE '%x.com%' THEN 'X / Twitter' WHEN referrer ILIKE '%linkedin%' THEN 'LinkedIn' ELSE ifNull(domainWithoutWWW(referrer), referrer) END AS channel, toFloat64(uniq(session_id)) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY channel ORDER BY value DESC LIMIT 10",
+                          "disabled": false,
+                          "legend": "{{ channel }}"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-table-pages": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Most visited blog posts and landing pages",
+            "name": "Top Articles & Pages"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TablePanel",
+            "spec": {
+              "formatting": {
+                "columnUnits": null,
+                "decimalPrecision": "0"
+              },
+              "thresholds": null,
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT path, count() AS pageviews, uniq(session_id) AS unique_sessions FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY path ORDER BY pageviews DESC LIMIT 20",
+                          "disabled": false,
+                          "legend": ""
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-pie-devices": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Visitor device distribution (Desktop, Mobile, Tablet)",
+            "name": "Device Breakdown"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/PieChartPanel",
+            "spec": {
+              "formatting": {
+                "decimalPrecision": "0",
+                "unit": ""
+              },
+              "legend": {
+                "customColors": null,
+                "mode": "table",
+                "position": "bottom"
+              },
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT device_type, toFloat64(count()) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY device_type ORDER BY value DESC",
+                          "disabled": false,
+                          "legend": "{{ device_type }}"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-table-outbound": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Clicks on outbound and partner destination links",
+            "name": "Outbound Link Clicks"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TablePanel",
+            "spec": {
+              "formatting": {
+                "columnUnits": null,
+                "decimalPrecision": "0"
+              },
+              "thresholds": null,
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT JSONExtractString(event_data, 'title') AS target_title, JSONExtractString(event_data, 'url') AS outbound_url, count() AS clicks FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'outbound_click' GROUP BY target_title, outbound_url ORDER BY clicks DESC LIMIT 20",
+                          "disabled": false,
+                          "legend": ""
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "panel-table-countries": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "description": "Geographic breakdown of visitors by country code",
+            "name": "Geographic Distribution"
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TablePanel",
+            "spec": {
+              "formatting": {
+                "columnUnits": null,
+                "decimalPrecision": "0"
+              },
+              "thresholds": null,
+              "visualization": {
+                "timePreference": "global_time"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "clickhouse_sql",
+                        "spec": {
+                          "name": "A",
+                          "query": "SELECT country, count() AS pageviews, uniq(visitor_id) AS unique_visitors FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY country ORDER BY pageviews DESC LIMIT 15",
+                          "disabled": false,
+                          "legend": ""
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "refreshInterval": "1m"
+  }
+}
