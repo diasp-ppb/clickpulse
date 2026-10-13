@@ -97,7 +97,8 @@ class ClickPulseTracker {
     const jsonStr = JSON.stringify(payload);
 
     if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-      const blob = new Blob([jsonStr], { type: "application/json" });
+      // Use text/plain Blob to ensure a CORS-safelisted simple request (avoids preflight issues in browsers)
+      const blob = new Blob([jsonStr], { type: "text/plain" });
       const sent = navigator.sendBeacon(this.config.endpoint, blob);
       if (sent) return;
     }
@@ -105,7 +106,7 @@ class ClickPulseTracker {
     if (typeof fetch !== "undefined") {
       fetch(this.config.endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain" },
         body: jsonStr,
         keepalive: true
       }).catch(() => {});

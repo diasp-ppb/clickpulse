@@ -32,27 +32,52 @@ export interface Env {
   OTEL_AUTH_TOKEN?: string;
 }
 
+function resolveOrigin(request: Request): string | null {
+  const origin = request.headers.get("Origin");
+  if (origin && origin !== "null") {
+    return origin;
+  }
+  const referer = request.headers.get("Referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      // ignore invalid URL
+    }
+  }
+  return null;
+}
+
 function getCorsHeaders(origin: string | null, allowedOriginsStr?: string): HeadersInit {
   const allowed = allowedOriginsStr
     ? allowedOriginsStr.split(",").map((s) => s.trim())
     : ["*"];
 
-  const allowOrigin =
-    allowed.includes("*") || (origin && allowed.includes(origin))
-      ? origin || "*"
-      : "null";
+  let allowOrigin = "null";
+  if (allowed.includes("*")) {
+    allowOrigin = origin || "*";
+  } else if (origin && allowed.includes(origin)) {
+    allowOrigin = origin;
+  } else if (!origin && allowed.length > 0) {
+    // When origin is absent (e.g. WebKit sendBeacon), fallback to first allowed origin
+    allowOrigin = allowed[0];
+  } else {
+    allowOrigin = "null";
+  }
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Vary": "Origin"
+    "Access-Control-Allow-Headers": "Content-Type, *",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin, Referer"
   };
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const origin = request.headers.get("Origin");
+    const origin = resolveOrigin(request);
     const corsHeaders = getCorsHeaders(origin, env.ALLOWED_ORIGINS);
 
     // 1. Handle CORS Preflight

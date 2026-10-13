@@ -122,14 +122,14 @@ var ClickPulse = (function (exports) {
     send(payload) {
       const jsonStr = JSON.stringify(payload);
       if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-        const blob = new Blob([jsonStr], { type: "application/json" });
+        const blob = new Blob([jsonStr], { type: "text/plain" });
         const sent = navigator.sendBeacon(this.config.endpoint, blob);
         if (sent) return;
       }
       if (typeof fetch !== "undefined") {
         fetch(this.config.endpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "text/plain" },
           body: jsonStr,
           keepalive: true
         }).catch(() => {
