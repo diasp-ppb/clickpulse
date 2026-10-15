@@ -18,11 +18,15 @@ export default defineConfig([
     globalName: "ClickPulse",
     minify: "terser",
     terserOptions: {
+      ecma: 2020,
       compress: {
         passes: 3,
         unsafe: true,
         unsafe_arrows: true,
-        pure_getters: true
+        unsafe_comps: true,
+        unsafe_methods: true,
+        pure_getters: true,
+        booleans_as_integers: true
       },
       mangle: {
         toplevel: true,

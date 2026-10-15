@@ -70,4 +70,24 @@ describe("Session Management (getOrCreateSessionId)", () => {
 
     vi.restoreAllMocks();
   });
+
+  it("generates valid RFC 4122 v4 UUID when crypto.randomUUID is unavailable", () => {
+    const origCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, "crypto", {
+      value: {},
+      writable: true,
+      configurable: true
+    });
+
+    const session = getOrCreateSessionId();
+    expect(session.sessionId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
+
+    Object.defineProperty(globalThis, "crypto", {
+      value: origCrypto,
+      writable: true,
+      configurable: true
+    });
+  });
 });

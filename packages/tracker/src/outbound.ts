@@ -20,7 +20,7 @@ export function registerOutboundClickListener(
     if (!anchor) return;
 
     const href = anchor.getAttribute("href");
-    if (!href || href[0] === "#" || href.startsWith("javascript:")) return;
+    if (!href || /^#|javascript:/.test(href)) return;
 
     let targetUrl: URL;
     try {
@@ -32,7 +32,7 @@ export function registerOutboundClickListener(
     const host = targetUrl.hostname;
     if (host !== currentHost || customDomains.some((d) => host.includes(d))) {
       const title =
-        anchor.getAttribute("data-title") ||
+        anchor.dataset?.title ||
         anchor.title ||
         anchor.textContent?.trim() ||
         host;

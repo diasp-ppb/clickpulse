@@ -4,9 +4,9 @@ var ClickPulse = (function (exports) {
   // src/session.ts
   var KEY_SID = "_cp_sid";
   var KEY_ACT = "_cp_act";
-  var DEFAULT_TIMEOUT_MS = 18e5;
   var memSid;
-  function getOrCreateSessionId(timeoutMs = DEFAULT_TIMEOUT_MS) {
+  function getOrCreateSessionId(timeoutMs = 18e5) {
+    const info = (sessionId, isNewSession) => ({ sessionId, isNewSession });
     try {
       const s = sessionStorage;
       const now = Date.now();
@@ -14,18 +14,16 @@ var ClickPulse = (function (exports) {
       const sid = s.getItem(KEY_SID);
       if (sid && lastActive && now - lastActive <= timeoutMs) {
         s.setItem(KEY_ACT, `${now}`);
-        return { sessionId: sid, isNewSession: false };
+        return info(sid, false);
       }
       const newSid = generateUUID();
       s.setItem(KEY_SID, newSid);
       s.setItem(KEY_ACT, `${now}`);
-      return { sessionId: newSid, isNewSession: true };
+      return info(newSid, true);
     } catch {
-      if (!memSid) {
-        memSid = generateUUID();
-        return { sessionId: memSid, isNewSession: true };
-      }
-      return { sessionId: memSid, isNewSession: false };
+      const isNew = !memSid;
+      if (isNew) memSid = generateUUID();
+      return info(memSid, isNew);
     }
   }
   function generateUUID() {
@@ -42,7 +40,7 @@ var ClickPulse = (function (exports) {
       const anchor = e.target?.closest?.("a");
       if (!anchor) return;
       const href = anchor.getAttribute("href");
-      if (!href || href[0] === "#" || href.startsWith("javascript:")) return;
+      if (!href || /^#|javascript:/.test(href)) return;
       let targetUrl;
       try {
         targetUrl = new URL(anchor.href, location.href);
@@ -51,7 +49,7 @@ var ClickPulse = (function (exports) {
       }
       const host = targetUrl.hostname;
       if (host !== currentHost || customDomains.some((d) => host.includes(d))) {
-        const title = anchor.getAttribute("data-title") || anchor.title || anchor.textContent?.trim() || host;
+        const title = anchor.dataset?.title || anchor.title || anchor.textContent?.trim() || host;
         callback({
           url: targetUrl.href,
           title: title.slice(0, 200),
@@ -71,14 +69,10 @@ var ClickPulse = (function (exports) {
     let off;
     const send = (payload) => {
       const jsonStr = JSON.stringify(payload);
-      if (navigator?.sendBeacon) {
-        const blob = new Blob([jsonStr], { type: "text/plain" });
-        if (navigator.sendBeacon(c.endpoint, blob)) return;
-      }
+      if (navigator?.sendBeacon?.(c.endpoint, jsonStr)) return;
       if (typeof fetch !== "undefined") {
         fetch(c.endpoint, {
           method: "POST",
-          headers: { "Content-Type": "text/plain" },
           body: jsonStr,
           keepalive: true
         }).catch(() => {
@@ -101,9 +95,8 @@ var ClickPulse = (function (exports) {
           const v = urlParams.get(`utm_${k}`);
           if (v) payload[`utm_${k}`] = v.slice(0, 100);
         }
-        const eventData = isNewSession ? { is_new_session: true, ...data && typeof data === "object" ? data : {} } : data && typeof data === "object" ? data : void 0;
-        if (eventData) {
-          payload.data = eventData;
+        if (isNewSession || data && typeof data === "object") {
+          payload.data = Object.assign(isNewSession ? { is_new_session: true } : {}, data);
         }
         send(payload);
       } catch {
@@ -134,20 +127,10 @@ var ClickPulse = (function (exports) {
     defaultTracker?.pageview(title);
   }
   if (typeof document !== "undefined") {
-    const currentScript = document.currentScript;
-    if (currentScript) {
-      const siteId = currentScript.getAttribute("data-site") || currentScript.dataset?.site;
-      const endpoint = currentScript.getAttribute("data-endpoint") || currentScript.dataset?.endpoint || "/api/analytics";
-      if (siteId) {
-        const autoInit = () => {
-          init({ siteId, endpoint });
-        };
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", autoInit, { once: true });
-        } else {
-          autoInit();
-        }
-      }
+    const d = document.currentScript?.dataset;
+    if (d?.site) {
+      const run = () => init({ siteId: d.site, endpoint: d.endpoint || "/api/analytics" });
+      document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run, { once: true }) : run();
     }
   }
 

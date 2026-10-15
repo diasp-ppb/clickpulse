@@ -16,7 +16,8 @@ export interface SessionInfo {
 
 let memSid: string | undefined;
 
-export function getOrCreateSessionId(timeoutMs: number = DEFAULT_TIMEOUT_MS): SessionInfo {
+export function getOrCreateSessionId(timeoutMs = 18e5): SessionInfo {
+  const info = (sessionId: string, isNewSession: boolean): SessionInfo => ({ sessionId, isNewSession });
   try {
     const s = sessionStorage;
     const now = Date.now();
@@ -25,19 +26,17 @@ export function getOrCreateSessionId(timeoutMs: number = DEFAULT_TIMEOUT_MS): Se
 
     if (sid && lastActive && now - lastActive <= timeoutMs) {
       s.setItem(KEY_ACT, `${now}`);
-      return { sessionId: sid, isNewSession: false };
+      return info(sid, false);
     }
 
     const newSid = generateUUID();
     s.setItem(KEY_SID, newSid);
     s.setItem(KEY_ACT, `${now}`);
-    return { sessionId: newSid, isNewSession: true };
+    return info(newSid, true);
   } catch {
-    if (!memSid) {
-      memSid = generateUUID();
-      return { sessionId: memSid, isNewSession: true };
-    }
-    return { sessionId: memSid, isNewSession: false };
+    const isNew = !memSid;
+    if (isNew) memSid = generateUUID();
+    return info(memSid!, isNew);
   }
 }
 

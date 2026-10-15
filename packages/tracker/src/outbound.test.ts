@@ -107,4 +107,31 @@ describe("Outbound Click Tracking", () => {
 
     expect(callback).not.toHaveBeenCalled();
   });
+
+  it("gracefully ignores anchors with malformed URLs that fail parsing", () => {
+    const callback = vi.fn();
+    cleanup = registerOutboundClickListener(callback);
+
+    const anchor = document.createElement("a");
+    anchor.setAttribute("href", "https://");
+    Object.defineProperty(anchor, "href", { value: "https://" });
+    document.body.appendChild(anchor);
+
+    // Mock URL constructor to throw when parsing this anchor
+    const origURL = globalThis.URL;
+    globalThis.URL = class extends origURL {
+      constructor(url: string | URL, base?: string | URL) {
+        if (url === "https://") {
+          throw new TypeError("Invalid URL");
+        }
+        super(url, base);
+      }
+    } as any;
+
+    anchor.click();
+
+    expect(callback).not.toHaveBeenCalled();
+
+    globalThis.URL = origURL;
+  });
 });

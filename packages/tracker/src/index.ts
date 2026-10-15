@@ -45,14 +45,10 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
 
   const send = (payload: TrackingPayload) => {
     const jsonStr = JSON.stringify(payload);
-    if (navigator?.sendBeacon) {
-      const blob = new Blob([jsonStr], { type: "text/plain" });
-      if (navigator.sendBeacon(c.endpoint, blob)) return;
-    }
+    if (navigator?.sendBeacon?.(c.endpoint, jsonStr)) return;
     if (typeof fetch !== "undefined") {
       fetch(c.endpoint, {
         method: "POST",
-        headers: { "Content-Type": "text/plain" },
         body: jsonStr,
         keepalive: true
       }).catch(() => {});
@@ -78,14 +74,8 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
         if (v) payload[`utm_${k}`] = v.slice(0, 100);
       }
 
-      const eventData = isNewSession
-        ? { is_new_session: true, ...(data && typeof data === "object" ? data : {}) }
-        : data && typeof data === "object"
-          ? data
-          : undefined;
-
-      if (eventData) {
-        payload.data = eventData;
+      if (isNewSession || (data && typeof data === "object")) {
+        payload.data = Object.assign(isNewSession ? { is_new_session: true } : {}, data);
       }
 
       send(payload);
@@ -124,24 +114,11 @@ export function pageview(title?: string): void {
 
 // Auto-initialize when embedded via <script data-site="..." data-endpoint="...">
 if (typeof document !== "undefined") {
-  const currentScript = document.currentScript as HTMLScriptElement | null;
-  if (currentScript) {
-    const siteId = currentScript.getAttribute("data-site") || currentScript.dataset?.site;
-    const endpoint =
-      currentScript.getAttribute("data-endpoint") ||
-      currentScript.dataset?.endpoint ||
-      "/api/analytics";
-
-    if (siteId) {
-      const autoInit = () => {
-        init({ siteId, endpoint });
-      };
-
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", autoInit, { once: true });
-      } else {
-        autoInit();
-      }
-    }
+  const d = (document.currentScript as HTMLScriptElement | null)?.dataset;
+  if (d?.site) {
+    const run = () => init({ siteId: d.site!, endpoint: d.endpoint || "/api/analytics" });
+    document.readyState === "loading"
+      ? document.addEventListener("DOMContentLoaded", run, { once: true })
+      : run();
   }
 }

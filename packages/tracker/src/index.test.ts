@@ -148,4 +148,74 @@ describe("ClickPulse Tracker SDK", () => {
       })
     );
   });
+
+  it("dispatches via sendBeacon without calling fetch when sendBeacon succeeds", () => {
+    const beaconSpy = vi.fn().mockReturnValue(true);
+    Object.defineProperty(navigator, "sendBeacon", {
+      value: beaconSpy,
+      writable: true,
+      configurable: true
+    });
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: false,
+      trackOutbound: false
+    });
+
+    track("beacon_test");
+
+    expect(beaconSpy).toHaveBeenCalledTimes(1);
+    expect(beaconSpy).toHaveBeenCalledWith(
+      "/api/analytics",
+      expect.stringContaining('"event":"beacon_test"')
+    );
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("captures and truncates document.referrer", () => {
+    const origReferrer = document.referrer;
+    Object.defineProperty(document, "referrer", {
+      value: "https://partner.com/" + "r".repeat(600),
+      writable: true,
+      configurable: true
+    });
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: false,
+      trackOutbound: false
+    });
+
+    track("ref_test");
+
+    expect(sentPayloads).toHaveLength(1);
+    expect((sentPayloads[0].referrer as string).length).toBe(500);
+
+    Object.defineProperty(document, "referrer", {
+      value: origReferrer,
+      writable: true,
+      configurable: true
+    });
+  });
+
+  it("cleans up outbound listeners on destroy()", () => {
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: false,
+      trackOutbound: true
+    });
+
+    trackerInstance.destroy();
+
+    const anchor = document.createElement("a");
+    anchor.href = "https://external.com";
+    document.body.appendChild(anchor);
+    anchor.click();
+
+    expect(sentPayloads).toHaveLength(0);
+  });
 });
