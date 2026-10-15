@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS clickpulse.daily_site_stats
 (
     date             Date,
     site_id          LowCardinality(String),
-    pageviews        UInt64,
+    pageviews        SimpleAggregateFunction(sum, UInt64),
+    session_starts   SimpleAggregateFunction(sum, UInt64),
     visitors_state   AggregateFunction(uniq, FixedString(64)),
     sessions_state   AggregateFunction(uniq, UUID)
 )
@@ -71,6 +72,7 @@ SELECT
     toDate(created_at) AS date,
     site_id,
     count() AS pageviews,
+    countIf(visitParamExtractBool(event_data, 'is_new_session') = 1) AS session_starts,
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
 FROM clickpulse.analytics_events
@@ -78,7 +80,87 @@ WHERE event_type = 'pageview'
 GROUP BY site_id, date;
 
 -- ----------------------------------------------------------------------------
--- 4. SigNoz OTLP Integration (Real-Time Ingestion Bridge)
+-- 4. Daily Landing Pages Materialized View (Pre-aggregated Entry Pages)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clickpulse.daily_landing_pages
+(
+    date             Date,
+    site_id          LowCardinality(String),
+    path             String,
+    session_starts   SimpleAggregateFunction(sum, UInt64),
+    visitors_state   AggregateFunction(uniq, FixedString(64)),
+    sessions_state   AggregateFunction(uniq, UUID)
+)
+ENGINE = AggregatingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (site_id, date, path)
+TTL date + INTERVAL 36 MONTH;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS clickpulse.daily_landing_pages_mv
+TO clickpulse.daily_landing_pages
+AS
+SELECT
+    toDate(created_at) AS date,
+    site_id,
+    path,
+    count() AS session_starts,
+    uniqState(visitor_id) AS visitors_state,
+    uniqState(session_id) AS sessions_state
+FROM clickpulse.analytics_events
+WHERE visitParamExtractBool(event_data, 'is_new_session') = 1
+GROUP BY site_id, date, path;
+
+-- ----------------------------------------------------------------------------
+-- 5. Daily Acquisition Channels Materialized View (Referrers & UTMs)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clickpulse.daily_sources
+(
+    date             Date,
+    site_id          LowCardinality(String),
+    channel          LowCardinality(String),
+    utm_source       LowCardinality(String),
+    utm_medium       LowCardinality(String),
+    utm_campaign     LowCardinality(String),
+    session_starts   SimpleAggregateFunction(sum, UInt64),
+    pageviews        SimpleAggregateFunction(sum, UInt64),
+    visitors_state   AggregateFunction(uniq, FixedString(64)),
+    sessions_state   AggregateFunction(uniq, UUID)
+)
+ENGINE = AggregatingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (site_id, date, channel, utm_source, utm_medium, utm_campaign)
+TTL date + INTERVAL 36 MONTH;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS clickpulse.daily_sources_mv
+TO clickpulse.daily_sources
+AS
+SELECT
+    toDate(created_at) AS date,
+    site_id,
+    CASE
+        WHEN referrer = '' OR referrer IS NULL THEN 'Direct / None'
+        WHEN referrer ILIKE '%google%' THEN 'Google Search'
+        WHEN referrer ILIKE '%bing%' THEN 'Bing Search'
+        WHEN referrer ILIKE '%github%' THEN 'GitHub'
+        WHEN referrer ILIKE '%news.ycombinator.com%' THEN 'Hacker News'
+        WHEN referrer ILIKE '%reddit%' THEN 'Reddit'
+        WHEN referrer ILIKE '%t.co%' OR referrer ILIKE '%twitter%' OR referrer ILIKE '%x.com%' THEN 'Twitter / X'
+        WHEN referrer ILIKE '%linkedin%' THEN 'LinkedIn'
+        ELSE ifNull(domainWithoutWWW(referrer), referrer)
+    END AS channel,
+    utm_source,
+    utm_medium,
+    utm_campaign,
+    countIf(visitParamExtractBool(event_data, 'is_new_session') = 1) AS session_starts,
+    count() AS pageviews,
+    uniqState(visitor_id) AS visitors_state,
+    uniqState(session_id) AS sessions_state
+FROM clickpulse.analytics_events
+WHERE event_type = 'pageview'
+GROUP BY site_id, date, channel, utm_source, utm_medium, utm_campaign;
+
+-- ----------------------------------------------------------------------------
+-- 6. SigNoz OTLP Integration (Real-Time Ingestion Bridge)
 -- If sending OTLP logs directly to SigNoz (/v1/logs), this Materialized View
 -- automatically streams incoming 'clickpulse' logs from SigNoz's log store
 -- into clickpulse.analytics_events with flat, typed columns in real-time.
