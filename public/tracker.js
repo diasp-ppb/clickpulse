@@ -6,28 +6,23 @@ var ClickPulse = (function (exports) {
   var KEY_ACT = "_cp_act";
   var memSid;
   function getOrCreateSessionId(timeoutMs = 18e5) {
-    const info = (sessionId, isNewSession) => ({ sessionId, isNewSession });
     try {
       const s = sessionStorage;
       const now = Date.now();
       const lastActive = +(s.getItem(KEY_ACT) || 0);
       const sid = s.getItem(KEY_SID);
-      if (sid && lastActive && now - lastActive <= timeoutMs) {
-        s.setItem(KEY_ACT, `${now}`);
-        return info(sid, false);
-      }
-      const newSid = generateUUID();
-      s.setItem(KEY_SID, newSid);
+      const isExisting = Boolean(sid && lastActive && now - lastActive <= timeoutMs);
+      const sessionId = isExisting ? sid : generateUUID();
+      s.setItem(KEY_SID, sessionId);
       s.setItem(KEY_ACT, `${now}`);
-      return info(newSid, true);
+      return { sessionId, isNewSession: !isExisting };
     } catch {
-      const isNew = !memSid;
-      if (isNew) memSid = generateUUID();
-      return info(memSid, isNew);
+      const isNewSession = !memSid;
+      return { sessionId: memSid ||= generateUUID(), isNewSession };
     }
   }
   function generateUUID() {
-    return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(
+    return globalThis.crypto?.randomUUID?.() || "10000000-1000-4000-8000-100000000000".replace(
       /[018]/g,
       (c) => (+c ^ Math.random() * 16 >> +c / 4).toString(16)
     );
@@ -67,18 +62,6 @@ var ClickPulse = (function (exports) {
     defaultTracker?.destroy();
     const c = { autoPageview: true, trackOutbound: true, ...config };
     let off;
-    const send = (payload) => {
-      const jsonStr = JSON.stringify(payload);
-      if (navigator?.sendBeacon?.(c.endpoint, jsonStr)) return;
-      if (typeof fetch !== "undefined") {
-        fetch(c.endpoint, {
-          method: "POST",
-          body: jsonStr,
-          keepalive: true
-        }).catch(() => {
-        });
-      }
-    };
     const trackFn = (eventType, data) => {
       try {
         const { sessionId, isNewSession } = getOrCreateSessionId(c.sessionTimeoutMs);
@@ -88,7 +71,7 @@ var ClickPulse = (function (exports) {
           session_id: sessionId,
           event: eventType.slice(0, 50),
           path: location.pathname.slice(0, 255),
-          referrer: document.referrer ? document.referrer.slice(0, 500) : null,
+          referrer: document.referrer.slice(0, 500) || null,
           ts: Date.now()
         };
         for (const k of ["source", "medium", "campaign"]) {
@@ -98,7 +81,11 @@ var ClickPulse = (function (exports) {
         if (isNewSession || data && typeof data === "object") {
           payload.data = Object.assign(isNewSession ? { is_new_session: true } : {}, data);
         }
-        send(payload);
+        const jsonStr = JSON.stringify(payload);
+        if (!navigator?.sendBeacon?.(c.endpoint, jsonStr) && typeof fetch !== "undefined") {
+          fetch(c.endpoint, { method: "POST", body: jsonStr, keepalive: true }).catch(() => {
+          });
+        }
       } catch {
       }
     };

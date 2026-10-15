@@ -26,7 +26,10 @@ export default defineConfig([
         unsafe_comps: true,
         unsafe_methods: true,
         pure_getters: true,
-        booleans_as_integers: true
+        booleans_as_integers: true,
+        toplevel: true,
+        top_retain: ["ClickPulse"],
+        keep_fargs: false
       },
       mangle: {
         toplevel: true,

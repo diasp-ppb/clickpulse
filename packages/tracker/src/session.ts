@@ -17,34 +17,28 @@ export interface SessionInfo {
 let memSid: string | undefined;
 
 export function getOrCreateSessionId(timeoutMs = 18e5): SessionInfo {
-  const info = (sessionId: string, isNewSession: boolean): SessionInfo => ({ sessionId, isNewSession });
   try {
     const s = sessionStorage;
     const now = Date.now();
     const lastActive = +(s.getItem(KEY_ACT) || 0);
     const sid = s.getItem(KEY_SID);
-
-    if (sid && lastActive && now - lastActive <= timeoutMs) {
-      s.setItem(KEY_ACT, `${now}`);
-      return info(sid, false);
-    }
-
-    const newSid = generateUUID();
-    s.setItem(KEY_SID, newSid);
+    const isExisting = Boolean(sid && lastActive && now - lastActive <= timeoutMs);
+    const sessionId = isExisting ? (sid as string) : generateUUID();
+    s.setItem(KEY_SID, sessionId);
     s.setItem(KEY_ACT, `${now}`);
-    return info(newSid, true);
+    return { sessionId, isNewSession: !isExisting };
   } catch {
-    const isNew = !memSid;
-    if (isNew) memSid = generateUUID();
-    return info(memSid!, isNew);
+    const isNewSession = !memSid;
+    return { sessionId: (memSid ||= generateUUID()), isNewSession };
   }
 }
 
 function generateUUID(): string {
-  return typeof crypto !== "undefined" && crypto.randomUUID
-    ? crypto.randomUUID()
-    : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
-        (+c ^ ((Math.random() * 16) >> (+c / 4))).toString(16)
-      );
+  return (
+    globalThis.crypto?.randomUUID?.() ||
+    "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) =>
+      (+c ^ ((Math.random() * 16) >> (+c / 4))).toString(16)
+    )
+  );
 }
 

@@ -43,18 +43,6 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
   const c = { autoPageview: true, trackOutbound: true, ...config };
   let off: (() => void) | undefined;
 
-  const send = (payload: TrackingPayload) => {
-    const jsonStr = JSON.stringify(payload);
-    if (navigator?.sendBeacon?.(c.endpoint, jsonStr)) return;
-    if (typeof fetch !== "undefined") {
-      fetch(c.endpoint, {
-        method: "POST",
-        body: jsonStr,
-        keepalive: true
-      }).catch(() => {});
-    }
-  };
-
   const trackFn = (eventType: string, data?: Record<string, unknown>): void => {
     try {
       const { sessionId, isNewSession } = getOrCreateSessionId(c.sessionTimeoutMs);
@@ -65,7 +53,7 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
         session_id: sessionId,
         event: eventType.slice(0, 50),
         path: location.pathname.slice(0, 255),
-        referrer: document.referrer ? document.referrer.slice(0, 500) : null,
+        referrer: document.referrer.slice(0, 500) || null,
         ts: Date.now()
       };
 
@@ -78,7 +66,10 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
         payload.data = Object.assign(isNewSession ? { is_new_session: true } : {}, data);
       }
 
-      send(payload);
+      const jsonStr = JSON.stringify(payload);
+      if (!navigator?.sendBeacon?.(c.endpoint, jsonStr) && typeof fetch !== "undefined") {
+        fetch(c.endpoint, { method: "POST", body: jsonStr, keepalive: true }).catch(() => {});
+      }
     } catch {}
   };
 
