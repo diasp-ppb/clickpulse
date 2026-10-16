@@ -226,6 +226,16 @@ export default {
         ingested = true;
       }
 
+      if (!ingested) {
+        return new Response(
+          JSON.stringify({ error: "Failed to persist event to any configured destination" }),
+          {
+            status: 502,
+            headers: { "Content-Type": "application/json", ...corsHeaders }
+          }
+        );
+      }
+
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders }

@@ -1,6 +1,6 @@
 /**
  * ClickPulse: Anonymous Visitor Hashing
- * Computes SHA-256(site_id + ip + user_agent + daily_salt)
+ * Computes HMAC-SHA-256(salt_secret, site_id + ip + user_agent + date)
  * Raw IP address is NEVER stored or sent to ClickHouse.
  */
 
@@ -10,14 +10,21 @@ export async function computeVisitorId(
   userAgent: string,
   saltSecret: string
 ): Promise<string> {
-  // Deterministic daily salt component
+  // Deterministic daily date component (UTC)
   const today = new Date().toISOString().slice(0, 10);
-  const input = `${siteId}:${ip}:${userAgent}:${saltSecret}:${today}`;
+  // Delimit fields with newlines to prevent delimiter-injection attacks (e.g. colons in IPv6 or User-Agent)
+  const message = `${siteId}\n${ip}\n${userAgent}\n${today}`;
 
   const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(saltSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
 
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(message));
+  const hashArray = Array.from(new Uint8Array(signature));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }

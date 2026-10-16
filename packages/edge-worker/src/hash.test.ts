@@ -29,4 +29,24 @@ describe("Anonymous Visitor Hash (computeVisitorId)", () => {
     expect(base).not.toBe(differentSalt);
     expect(base).not.toBe(differentSite);
   });
+
+  it("handles IPv6 addresses with multiple colons correctly and deterministically", async () => {
+    const ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+    const hash1 = await computeVisitorId("siteA", ipv6, "UA-String", "salt-1");
+    const hash2 = await computeVisitorId("siteA", ipv6, "UA-String", "salt-1");
+
+    expect(hash1).toHaveLength(64);
+    expect(hash1).toBe(hash2);
+
+    const differentIpv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7335";
+    const hash3 = await computeVisitorId("siteA", differentIpv6, "UA-String", "salt-1");
+    expect(hash1).not.toBe(hash3);
+  });
+
+  it("prevents boundary shifting between IP and user-agent", async () => {
+    const hashA = await computeVisitorId("site", "1.2.3.4", "extra-ua", "salt");
+    const hashB = await computeVisitorId("site", "1.2.3.", "4extra-ua", "salt");
+
+    expect(hashA).not.toBe(hashB);
+  });
 });

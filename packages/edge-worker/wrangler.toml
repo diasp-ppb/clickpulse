@@ -29,6 +29,7 @@ CLICKHOUSE_TABLE = "analytics_events"
 # ------------------------------------------------------------------------------
 # Secondary / Shock Absorber Mode: Cloudflare D1 Spool (Spools on backend downtime)
 # ------------------------------------------------------------------------------
+# Initialize D1 table: npx wrangler d1 execute clickpulse-d1 --file=schema-d1.sql
 # [[d1_databases]]
 # binding = "DB"
 # database_name = "clickpulse-d1"

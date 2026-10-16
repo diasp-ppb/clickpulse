@@ -175,7 +175,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT uniq(visitor_id) AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview'",
+                          "query": "SELECT uniq(visitor_id) AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY",
                           "disabled": false,
                           "legend": "Visitors"
                         }
@@ -229,7 +229,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT uniq(session_id) AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview'",
+                          "query": "SELECT uniq(session_id) AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY",
                           "disabled": false,
                           "legend": "Sessions"
                         }
@@ -283,7 +283,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT count() AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview'",
+                          "query": "SELECT count() AS value, now() AS ts FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY",
                           "disabled": false,
                           "legend": "Pageviews"
                         }
@@ -337,7 +337,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT ifNull(round(countIf(hits = 1) * 100.0 / nullIf(count(), 0), 1), 0) AS value, now() AS ts FROM (SELECT session_id, count() AS hits FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY session_id)",
+                          "query": "SELECT ifNull(round(countIf(hits = 1) * 100.0 / nullIf(count(), 0), 1), 0) AS value, now() AS ts FROM (SELECT session_id, count() AS hits FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY session_id)",
                           "disabled": false,
                           "legend": "Bounce Rate"
                         }
@@ -404,7 +404,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT toStartOfHour(created_at) AS ts, toFloat64(count()) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY ts ORDER BY ts ASC",
+                          "query": "SELECT toStartOfHour(created_at) AS ts, toFloat64(count()) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY ts ORDER BY ts ASC",
                           "disabled": false,
                           "legend": "Pageviews"
                         }
@@ -413,7 +413,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "B",
-                          "query": "SELECT toStartOfHour(created_at) AS ts, toFloat64(uniq(visitor_id)) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY ts ORDER BY ts ASC",
+                          "query": "SELECT toStartOfHour(created_at) AS ts, toFloat64(uniq(visitor_id)) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY ts ORDER BY ts ASC",
                           "disabled": false,
                           "legend": "Unique Visitors"
                         }
@@ -463,7 +463,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT CASE WHEN referrer = '' OR referrer IS NULL THEN 'Direct / None' WHEN referrer ILIKE '%google%' THEN 'Google Search' WHEN referrer ILIKE '%github%' THEN 'GitHub' WHEN referrer ILIKE '%reddit%' THEN 'Reddit' WHEN referrer ILIKE '%ycombinator%' THEN 'Hacker News' WHEN referrer ILIKE '%twitter%' OR referrer ILIKE '%t.co%' OR referrer ILIKE '%x.com%' THEN 'X / Twitter' WHEN referrer ILIKE '%linkedin%' THEN 'LinkedIn' ELSE ifNull(domainWithoutWWW(referrer), referrer) END AS channel, toFloat64(uniq(session_id)) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY channel ORDER BY value DESC LIMIT 10",
+                          "query": "SELECT CASE WHEN referrer = '' OR referrer IS NULL THEN 'Direct / None' WHEN referrer ILIKE '%google%' THEN 'Google Search' WHEN referrer ILIKE '%github%' THEN 'GitHub' WHEN referrer ILIKE '%reddit%' THEN 'Reddit' WHEN referrer ILIKE '%ycombinator%' THEN 'Hacker News' WHEN referrer ILIKE '%twitter%' OR referrer ILIKE '%t.co%' OR referrer ILIKE '%x.com%' THEN 'X / Twitter' WHEN referrer ILIKE '%linkedin%' THEN 'LinkedIn' ELSE ifNull(domainWithoutWWW(referrer), referrer) END AS channel, toFloat64(uniq(session_id)) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY channel ORDER BY value DESC LIMIT 10",
                           "disabled": false,
                           "legend": "{{ channel }}"
                         }
@@ -509,7 +509,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT path, count() AS pageviews, uniq(session_id) AS unique_sessions FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY path ORDER BY pageviews DESC LIMIT 20",
+                          "query": "SELECT path, count() AS pageviews, uniq(session_id) AS unique_sessions FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY path ORDER BY pageviews DESC LIMIT 20",
                           "disabled": false,
                           "legend": ""
                         }
@@ -559,7 +559,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT device_type, toFloat64(count()) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY device_type ORDER BY value DESC",
+                          "query": "SELECT device_type, toFloat64(count()) AS value FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY device_type ORDER BY value DESC",
                           "disabled": false,
                           "legend": "{{ device_type }}"
                         }
@@ -605,7 +605,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT JSONExtractString(event_data, 'title') AS target_title, JSONExtractString(event_data, 'url') AS outbound_url, count() AS clicks FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'outbound_click' GROUP BY target_title, outbound_url ORDER BY clicks DESC LIMIT 20",
+                          "query": "SELECT JSONExtractString(event_data, 'title') AS target_title, JSONExtractString(event_data, 'url') AS outbound_url, count() AS clicks FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'outbound_click' AND created_at >= now() - INTERVAL 7 DAY GROUP BY target_title, outbound_url ORDER BY clicks DESC LIMIT 20",
                           "disabled": false,
                           "legend": ""
                         }
@@ -651,7 +651,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT country, count() AS pageviews, uniq(visitor_id) AS unique_visitors FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' GROUP BY country ORDER BY pageviews DESC LIMIT 15",
+                          "query": "SELECT country, count() AS pageviews, uniq(visitor_id) AS unique_visitors FROM clickpulse.analytics_events WHERE site_id IN $site_id AND event_type = 'pageview' AND created_at >= now() - INTERVAL 7 DAY GROUP BY country ORDER BY pageviews DESC LIMIT 15",
                           "disabled": false,
                           "legend": ""
                         }
