@@ -40,3 +40,9 @@ CLICKHOUSE_TABLE = "analytics_events"
 # ------------------------------------------------------------------------------
 # OTEL_EXPORTER_OTLP_ENDPOINT = "https://collector.yourdomain.com"
 # OTEL_AUTH_TOKEN = ""
+
+# ------------------------------------------------------------------------------
+# Automated Shock Absorber Drain: Cron Trigger (Flushes D1 buffer to ClickHouse)
+# ------------------------------------------------------------------------------
+# [triggers]
+# crons = ["*/10 * * * *"]
