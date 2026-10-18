@@ -160,7 +160,42 @@ WHERE event_type = 'pageview'
 GROUP BY site_id, date, channel, utm_source, utm_medium, utm_campaign;
 
 -- ----------------------------------------------------------------------------
--- 6. SigNoz OTLP Integration (Real-Time Ingestion Bridge)
+-- 6. Daily Session Stats Materialized View (Hyper-fast Bounce Rate & Duration)
+-- Pre-aggregates hits, start time, and end time per session.
+-- Enables instant bounce rate and session duration calculations across any date range.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clickpulse.daily_session_stats
+(
+    date             Date,
+    site_id          LowCardinality(String),
+    session_id       UUID,
+    visitor_id       FixedString(64),
+    hits             SimpleAggregateFunction(sum, UInt32),
+    first_seen       SimpleAggregateFunction(min, DateTime64(3, 'UTC')),
+    last_seen        SimpleAggregateFunction(max, DateTime64(3, 'UTC'))
+)
+ENGINE = AggregatingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (site_id, date, session_id)
+TTL date + INTERVAL 36 MONTH;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS clickpulse.daily_session_stats_mv
+TO clickpulse.daily_session_stats
+AS
+SELECT
+    toDate(created_at) AS date,
+    site_id,
+    session_id,
+    visitor_id,
+    count() AS hits,
+    min(created_at) AS first_seen,
+    max(created_at) AS last_seen
+FROM clickpulse.analytics_events
+WHERE event_type = 'pageview'
+GROUP BY site_id, date, session_id, visitor_id;
+
+-- ----------------------------------------------------------------------------
+-- 7. SigNoz OTLP Integration (Real-Time Ingestion Bridge)
 -- If sending OTLP logs directly to SigNoz (/v1/logs), this Materialized View
 -- automatically streams incoming 'clickpulse' logs from SigNoz's log store
 -- into clickpulse.analytics_events with flat, typed columns in real-time.
@@ -188,7 +223,7 @@ GROUP BY site_id, date, channel, utm_source, utm_medium, utm_campaign;
 --    OR resources_string_value[indexOf(resources_string_key, 'service.name')] = 'clickpulse';
 
 -- ----------------------------------------------------------------------------
--- 5. Database Hardening & Sandboxed User (Zero-Trust Security)
+-- 8. Database Hardening & Sandboxed User (Zero-Trust Security)
 -- Protects ClickHouse from connection spikes, memory exhaustion, and unauthorized reads.
 -- ----------------------------------------------------------------------------
 
