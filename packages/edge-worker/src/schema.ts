@@ -11,6 +11,8 @@ export interface ValidatedEvent {
   utm_source: string;
   utm_medium: string;
   utm_campaign: string;
+  utm_term: string;
+  utm_content: string;
   country: string;
   device_type: string;
   browser: string;
@@ -69,6 +71,8 @@ export function validateAndSanitize(
   const utm_source = (typeof raw.utm_source === "string" ? raw.utm_source : "").slice(0, 100);
   const utm_medium = (typeof raw.utm_medium === "string" ? raw.utm_medium : "").slice(0, 100);
   const utm_campaign = (typeof raw.utm_campaign === "string" ? raw.utm_campaign : "").slice(0, 100);
+  const utm_term = (typeof raw.utm_term === "string" ? raw.utm_term : "").slice(0, 100);
+  const utm_content = (typeof raw.utm_content === "string" ? raw.utm_content : "").slice(0, 100);
 
   // 7. Request metadata from Cloudflare headers
   const cf = (request as any).cf || {};
@@ -104,6 +108,8 @@ export function validateAndSanitize(
       utm_source,
       utm_medium,
       utm_campaign,
+      utm_term,
+      utm_content,
       country,
       device_type,
       browser,

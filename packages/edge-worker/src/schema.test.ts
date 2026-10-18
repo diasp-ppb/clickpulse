@@ -24,6 +24,8 @@ describe("Edge Worker Schema Validation & Sanitization", () => {
       utm_source: "google",
       utm_medium: "search",
       utm_campaign: "launch",
+      utm_term: "analytics",
+      utm_content: "header_cta",
       ts: Date.now(),
       data: { is_new_session: true, plan: "pro" }
     };
@@ -34,6 +36,8 @@ describe("Edge Worker Schema Validation & Sanitization", () => {
     if (result.valid) {
       expect(result.event.site_id).toBe("example.com");
       expect(result.event.event).toBe("pageview");
+      expect(result.event.utm_term).toBe("analytics");
+      expect(result.event.utm_content).toBe("header_cta");
       expect(result.event.device_type).toBe("desktop");
       expect(result.event.browser).toBe("Chrome");
       expect(JSON.parse(result.event.event_data)).toEqual({

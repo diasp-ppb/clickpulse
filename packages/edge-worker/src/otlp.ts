@@ -50,6 +50,8 @@ export async function sendOtlpLog(
     { key: "utm.source", value: { stringValue: event.utm_source } },
     { key: "utm.medium", value: { stringValue: event.utm_medium } },
     { key: "utm.campaign", value: { stringValue: event.utm_campaign } },
+    { key: "utm.term", value: { stringValue: event.utm_term } },
+    { key: "utm.content", value: { stringValue: event.utm_content } },
     { key: "geo.country", value: { stringValue: event.country } },
     { key: "device.type", value: { stringValue: event.device_type } },
     { key: "browser.name", value: { stringValue: event.browser } },

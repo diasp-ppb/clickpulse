@@ -24,6 +24,7 @@ class D1Extractor:
         sql = (
             "SELECT id, created_at, site_id, event_type, visitor_id, session_id, "
             "path, referrer, utm_source, utm_medium, utm_campaign, "
+            "utm_term, utm_content, "
             "country, device_type, browser, event_data "
             f"FROM clickpulse_buffer ORDER BY id ASC LIMIT {limit};"
         )

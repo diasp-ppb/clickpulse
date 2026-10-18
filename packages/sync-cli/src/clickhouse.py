@@ -57,6 +57,8 @@ class ClickHouseIngester:
                     "utm_source": e.get("utm_source") or "",
                     "utm_medium": e.get("utm_medium") or "",
                     "utm_campaign": e.get("utm_campaign") or "",
+                    "utm_term": e.get("utm_term") or "",
+                    "utm_content": e.get("utm_content") or "",
                     "country": e.get("country") or "",
                     "device_type": e.get("device_type") or "desktop",
                     "browser": e.get("browser") or "other",

@@ -255,8 +255,9 @@ async function bufferToD1(db: D1Database, event: any, visitorId: string): Promis
       `INSERT INTO clickpulse_buffer (
         created_at, site_id, event_type, visitor_id, session_id,
         path, referrer, utm_source, utm_medium, utm_campaign,
+        utm_term, utm_content,
         country, device_type, browser, event_data
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       new Date(event.ts).toISOString(),
@@ -269,6 +270,8 @@ async function bufferToD1(db: D1Database, event: any, visitorId: string): Promis
       event.utm_source,
       event.utm_medium,
       event.utm_campaign,
+      event.utm_term,
+      event.utm_content,
       event.country,
       event.device_type,
       event.browser,
