@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS clickpulse_buffer (
     utm_source   TEXT,
     utm_medium   TEXT,
     utm_campaign TEXT,
+    utm_term     TEXT,
+    utm_content  TEXT,
     country      TEXT,
     device_type  TEXT,
     browser      TEXT,

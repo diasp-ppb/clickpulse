@@ -86,7 +86,7 @@ describe("ClickPulse Tracker SDK", () => {
     Object.defineProperty(window, "location", {
       value: {
         ...originalLocation,
-        search: "?utm_source=google&utm_medium=cpc&utm_campaign=summer_sale_2026",
+        search: "?utm_source=google&utm_medium=cpc&utm_campaign=summer_sale_2026&utm_term=analytics+engine&utm_content=banner_v2",
         pathname: "/landing-page"
       },
       writable: true,
@@ -108,6 +108,8 @@ describe("ClickPulse Tracker SDK", () => {
     expect(payload.utm_source).toBe("google");
     expect(payload.utm_medium).toBe("cpc");
     expect(payload.utm_campaign).toBe("summer_sale_2026");
+    expect(payload.utm_term).toBe("analytics engine");
+    expect(payload.utm_content).toBe("banner_v2");
 
     Object.defineProperty(window, "location", {
       value: originalLocation,

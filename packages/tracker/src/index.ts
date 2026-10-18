@@ -24,6 +24,8 @@ export interface TrackingPayload {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
   data?: Record<string, unknown>;
   ts: number;
 }
@@ -57,7 +59,7 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
         ts: Date.now()
       };
 
-      for (const k of ["source", "medium", "campaign"] as const) {
+      for (const k of ["source", "medium", "campaign", "term", "content"] as const) {
         const v = urlParams.get(`utm_${k}`);
         if (v) payload[`utm_${k}`] = v.slice(0, 100);
       }

@@ -39,6 +39,8 @@ export async function sendDirectToClickHouse(
     utm_source: event.utm_source,
     utm_medium: event.utm_medium,
     utm_campaign: event.utm_campaign,
+    utm_term: event.utm_term,
+    utm_content: event.utm_content,
     country: event.country,
     device_type: event.device_type,
     browser: event.browser,

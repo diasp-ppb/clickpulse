@@ -74,7 +74,7 @@ var ClickPulse = (function (exports) {
           referrer: document.referrer.slice(0, 500) || null,
           ts: Date.now()
         };
-        for (const k of ["source", "medium", "campaign"]) {
+        for (const k of ["source", "medium", "campaign", "term", "content"]) {
           const v = urlParams.get(`utm_${k}`);
           if (v) payload[`utm_${k}`] = v.slice(0, 100);
         }

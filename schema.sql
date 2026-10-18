@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS clickpulse.analytics_events
     utm_source   LowCardinality(String),
     utm_medium   LowCardinality(String),
     utm_campaign LowCardinality(String),
+    utm_term     LowCardinality(String),
+    utm_content  LowCardinality(String),
     country      LowCardinality(FixedString(2)),
     device_type  LowCardinality(String),
     browser      LowCardinality(String),
