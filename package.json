@@ -11,7 +11,8 @@
     "typecheck": "npm --workspaces run typecheck",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "demo": "node demo/server.mjs"
   },
   "author": "ClickPulse Contributors",
   "license": "MIT",
