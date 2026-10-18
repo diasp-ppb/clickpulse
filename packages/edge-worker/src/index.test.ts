@@ -142,4 +142,64 @@ describe("Edge Worker Ingestion Handler (index.ts)", () => {
     expect(bindMock).toHaveBeenCalledTimes(1);
     expect(runMock).toHaveBeenCalledTimes(1);
   });
+
+  it("silently drops bot requests with 200 and filtered: bot by default", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const req = new Request("https://edge.clickpulse.io/api/analytics", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+      },
+      body: JSON.stringify({
+        site_id: "example.com",
+        session_id: "c73bcdcc-2669-4bf6-81d3-e4ae73fb11fd",
+        event: "pageview",
+        ts: Date.now()
+      })
+    });
+
+    const res = await worker.fetch(req, {
+      CLICKHOUSE_ENDPOINT: "https://clickhouse.example.com"
+    });
+
+    expect(res.status).toBe(200);
+    const body: any = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.filtered).toBe("bot");
+    // Verify ClickHouse was NOT contacted
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("ingests bot requests when DROP_BOTS is explicitly set to false", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 200 })
+    );
+
+    const req = new Request("https://edge.clickpulse.io/api/analytics", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+      },
+      body: JSON.stringify({
+        site_id: "example.com",
+        session_id: "c73bcdcc-2669-4bf6-81d3-e4ae73fb11fd",
+        event: "pageview",
+        ts: Date.now()
+      })
+    });
+
+    const res = await worker.fetch(req, {
+      CLICKHOUSE_ENDPOINT: "https://clickhouse.example.com",
+      DROP_BOTS: "false"
+    });
+
+    expect(res.status).toBe(200);
+    const body: any = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.filtered).toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
 });

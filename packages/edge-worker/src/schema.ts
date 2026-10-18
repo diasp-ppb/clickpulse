@@ -27,10 +27,60 @@ const ALLOWED_EVENT_TYPES = new Set([
   "conversion"
 ]);
 
+const BOT_PATTERNS = [
+  "bot",
+  "spider",
+  "crawl",
+  "slurp",
+  "headless",
+  "puppeteer",
+  "playwright",
+  "selenium",
+  "webdriver",
+  "lighthouse",
+  "ahrefs",
+  "semrush",
+  "pingdom",
+  "uptimerobot",
+  "facebookexternalhit",
+  "slackbot",
+  "twitterbot",
+  "linkedinbot",
+  "whatsapp",
+  "telegrambot",
+  "python-requests",
+  "curl",
+  "wget"
+];
+
+export function isBot(userAgent: string, request?: Request): boolean {
+  if (userAgent) {
+    const ua = userAgent.toLowerCase();
+    if (BOT_PATTERNS.some((pattern) => ua.includes(pattern))) {
+      return true;
+    }
+  }
+
+  if (request) {
+    const cf = (request as any).cf;
+    if (cf) {
+      if (cf.botManagement?.verifiedBot === true) return true;
+      if (typeof cf.botManagement?.score === "number" && cf.botManagement.score < 30) return true;
+      if (typeof cf.clientTrustScore === "number" && cf.clientTrustScore < 30) return true;
+    }
+  }
+
+  return false;
+}
+
+export type ValidationResult =
+  | { valid: true; event: ValidatedEvent; isBot: boolean }
+  | { valid: false; reason: string };
+
 export function validateAndSanitize(
   raw: any,
   request: Request
-): { valid: true; event: ValidatedEvent } | { valid: false; reason: string } {
+): ValidationResult {
   if (!raw || typeof raw !== "object") {
     return { valid: false, reason: "Payload must be a JSON object" };
   }
@@ -75,12 +125,12 @@ export function validateAndSanitize(
   const country = (cf.country || "").slice(0, 2).toUpperCase();
 
   const userAgent = request.headers.get("user-agent") || "";
+  const botDetected = isBot(userAgent, request);
   const { device_type, browser } = parseUserAgent(userAgent);
 
   // 8. Custom data (max 10 keys, primitive types)
-  let event_data = "{}";
+  const sanitizedData: Record<string, string | number | boolean> = {};
   if (raw.data && typeof raw.data === "object" && !Array.isArray(raw.data)) {
-    const sanitizedData: Record<string, string | number | boolean> = {};
     const keys = Object.keys(raw.data).slice(0, 10);
     for (const key of keys) {
       const val = raw.data[key];
@@ -90,11 +140,15 @@ export function validateAndSanitize(
         sanitizedData[key.slice(0, 50)] = val;
       }
     }
-    event_data = JSON.stringify(sanitizedData);
   }
+  if (botDetected) {
+    sanitizedData.is_bot = true;
+  }
+  const event_data = Object.keys(sanitizedData).length > 0 ? JSON.stringify(sanitizedData) : "{}";
 
   return {
     valid: true,
+    isBot: botDetected,
     event: {
       site_id: siteId,
       session_id: sessionId,
