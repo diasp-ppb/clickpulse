@@ -3,18 +3,23 @@ name: Deploy Tracker to GitHub Pages
 on:
   push:
     branches: ["main"]
+    paths:
+      - "packages/tracker/**"
+      - "public/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# Cancel obsolete in-progress runs on rapid pushes to save Actions runner minutes
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -37,6 +42,15 @@ jobs:
 
       - name: Build tracker bundles
         run: npm run build
+
+      - name: Verify tracker budget (< 1.5 KB gzipped)
+        run: |
+          SIZE=$(gzip -c public/tracker.min.js | wc -c | tr -d ' ')
+          echo "Tracker min+gz size: ${SIZE} bytes"
+          if [ "$SIZE" -gt 1536 ]; then
+            echo "Error: Tracker bundle exceeds 1.5 KB limit (${SIZE}B > 1536B)"
+            exit 1
+          fi
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5

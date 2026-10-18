@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "tracker-qa": {
+      "skillPath": ".agents/skills/tracker-qa/SKILL.md"
+    },
+    "edge-clickhouse-qa": {
+      "skillPath": ".agents/skills/edge-clickhouse-qa/SKILL.md"
+    },
+    "code-review": {
+      "skillPath": ".agents/skills/code-review/SKILL.md"
+    },
+    "sre-review": {
+      "skillPath": ".agents/skills/sre-review/SKILL.md"
+    },
+    "architecture-keeper": {
+      "skillPath": ".agents/skills/architecture-keeper/SKILL.md"
+    },
+    "codebase-design": {
+      "skillPath": ".agents/skills/codebase-design/SKILL.md"
+    },
+    "domain-modeling": {
+      "skillPath": ".agents/skills/domain-modeling/SKILL.md"
+    },
+    "grilling": {
+      "skillPath": ".agents/skills/grilling/SKILL.md"
+    }
+  }
+}

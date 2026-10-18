@@ -1,0 +1,22 @@
+# Cursor Rules — ClickPulse
+
+Consulte as regras completas e diretrizes detalhadas em [AGENTS.md](AGENTS.md).
+
+## 🚨 REGRA MANDATÓRIA: Execução Local Obrigatória de Testes
+- Após QUALQUER alteração ou conjunto de alterações a código (`packages/tracker/`, `packages/edge-worker/`, `packages/sync-cli/`), é OBRIGATÓRIO correr os testes e verificação de tipos localmente antes de considerar a tarefa terminada ou criar commits:
+  ```bash
+  npm test
+  npm run typecheck
+  ```
+- Se o tracker for modificado, valide o orçamento de bundle (< 1.5 KB gzipped):
+  ```bash
+  npm run build
+  gzip -c public/tracker.min.js | wc -c
+  ```
+- NUNCA assumir que o código funciona sem executar os testes e validar o output.
+- Se algum teste falhar, analisar e corrigir a regressão até obter aprovação a 100%.
+
+## 🛠️ Ambiente e Princípios
+- Zero Cookies: o tracker utiliza exclusivamente `sessionStorage` e `sendBeacon`.
+- Zero Trust & Shock Absorber: ingestão segura no Edge com fallback para Cloudflare D1 Spool.
+- Otimização de Custos: tarefas simples devem ser executadas diretamente sem invocar múltiplos agentes.
