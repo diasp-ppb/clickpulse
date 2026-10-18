@@ -218,4 +218,45 @@ describe("ClickPulse Tracker SDK", () => {
 
     expect(sentPayloads).toHaveLength(0);
   });
+
+  it("automatically tracks declarative events from clicked elements", () => {
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: false,
+      trackDeclarative: true
+    });
+
+    const button = document.createElement("button");
+    button.setAttribute("data-clickpulse", "signup");
+    button.setAttribute("data-clickpulse-plan", "premium");
+    document.body.appendChild(button);
+
+    button.click();
+
+    expect(sentPayloads).toHaveLength(1);
+    expect(sentPayloads[0].event).toBe("signup");
+    expect(sentPayloads[0].data).toEqual(
+      expect.objectContaining({
+        plan: "premium"
+      })
+    );
+  });
+
+  it("does not track declarative events when trackDeclarative is false", () => {
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: false,
+      trackDeclarative: false
+    });
+
+    const button = document.createElement("button");
+    button.setAttribute("data-clickpulse", "signup");
+    document.body.appendChild(button);
+
+    button.click();
+
+    expect(sentPayloads).toHaveLength(0);
+  });
 });
