@@ -25,6 +25,23 @@ If you already run ClickHouse—the world's fastest columnar analytical engine�
 
 ---
 
+## ⚡ 60-Second Local Quickstart
+
+Spin up a complete local stack with ClickHouse, pre-provisioned Grafana dashboards, and an interactive demo playground:
+
+```bash
+# 1. Clone & start the containers
+docker compose up -d
+
+# 2. Open the Interactive Playground & Grafana
+# 👉 Demo Site: http://localhost:8080
+# 👉 Grafana Dashboard: http://localhost:3000 (User/Pass: admin / admin)
+```
+
+Interact with the buttons on the playground to generate live pageviews, SPA transitions, UTM campaign events, and custom conversions. Watch the metrics reflect in Grafana within milliseconds!
+
+---
+
 ## ⚖️ Why Not Just Use OpenTelemetry RUM?
 
 A common question from SREs: *"Why not just use `@opentelemetry/sdk-trace-web` (OTel RUM)?"*

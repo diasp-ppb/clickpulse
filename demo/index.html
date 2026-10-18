@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClickPulse ⚡ Local Playground</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151c2d;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border: #1f293d;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 2rem; max-width: 900px; margin: 0 auto; line-height: 1.6; }
+    header { text-align: center; margin-bottom: 2.5rem; }
+    h1 { font-size: 2.5rem; margin-bottom: 0.5rem; font-weight: 800; background: linear-gradient(90deg, #60a5fa, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    p.lead { color: var(--text-muted); font-size: 1.1rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+    .card h2 { font-size: 1.25rem; margin-bottom: 1rem; color: #93c5fd; }
+    button, a.btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--accent); color: white; border: none; padding: 0.75rem 1.25rem;
+      border-radius: 8px; font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: background 0.2s; margin: 0.25rem 0.25rem 0.25rem 0; font-size: 0.95rem;
+    }
+    button:hover, a.btn:hover { background: var(--accent-hover); }
+    button.secondary { background: #374151; }
+    button.secondary:hover { background: #4b5563; }
+    .log-box { background: #030712; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; font-family: monospace; font-size: 0.85rem; height: 180px; overflow-y: auto; color: #34d399; }
+    .status-badge { display: inline-block; background: rgba(16, 185, 129, 0.2); color: var(--success); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
+    ul { list-style: inside square; color: var(--text-muted); margin-bottom: 1rem; }
+  </style>
+
+  <!-- ClickPulse Auto-Initialized Tracker -->
+  <script defer src="/tracker.min.js" data-site="demo-store" data-endpoint="/api/analytics"></script>
+</head>
+<body>
+  <header>
+    <div class="status-badge">⚡ Live Local Ingestion Connected</div>
+    <h1>ClickPulse Playground</h1>
+    <p class="lead">Interactive sandbox generating live telemetry into ClickHouse & Grafana.</p>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2>1. SPA Route Navigation</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">Changes URL client-side via <code>history.pushState</code>.</p>
+      <button onclick="navigateTo('/pricing')">Go to /pricing</button>
+      <button onclick="navigateTo('/docs')">Go to /docs</button>
+      <button onclick="navigateTo('/blog/clickhouse')">Go to /blog</button>
+      <button class="secondary" onclick="navigateTo('/')">Home</button>
+    </div>
+
+    <div class="card">
+      <h2>2. Declarative Event Tracking</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">Zero-JS tracking via <code>data-clickpulse</code> attributes.</p>
+      <button data-clickpulse="checkout_click" data-clickpulse-plan="pro" data-clickpulse-amount="49">
+        Buy Pro ($49)
+      </button>
+      <button data-clickpulse="newsletter_signup" data-clickpulse-tier="free">
+        Subscribe
+      </button>
+    </div>
+
+    <div class="card">
+      <h2>3. Campaign Simulation (UTMs)</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">Simulate visitor arrivals from ad campaigns.</p>
+      <a href="/?utm_source=google&utm_medium=cpc&utm_campaign=summer_sale&utm_term=analytics&utm_content=banner" class="btn">
+        Google Ads
+      </a>
+      <a href="/?utm_source=twitter&utm_medium=social&utm_campaign=launch" class="btn secondary">
+        Twitter / X
+      </a>
+    </div>
+
+    <div class="card">
+      <h2>4. Outbound Link Tracking</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">Automatic click tracking for external destinations.</p>
+      <a href="https://github.com/diasp-ppb/clickpulse" target="_blank" class="btn secondary">
+        GitHub Repo ↗
+      </a>
+      <a href="https://clickhouse.com" target="_blank" class="btn secondary">
+        ClickHouse.com ↗
+      </a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Client Event Log (Outgoing Network Beacons)</h2>
+    <div id="log" class="log-box">[System] Waiting for user interactions...</div>
+  </div>
+
+  <script>
+    function logEvent(msg) {
+      const box = document.getElementById("log");
+      const time = new Date().toLocaleTimeString();
+      box.innerHTML = `[${time}] ${msg}<br/>` + box.innerHTML;
+    }
+
+    function navigateTo(path) {
+      history.pushState({}, "", path);
+      logEvent(`Navigated to: ${path} (Triggered SPA pageview)`);
+    }
+
+    // Intercept fetch & sendBeacon to log in UI
+    const origFetch = window.fetch;
+    window.fetch = function(...args) {
+      if (typeof args[0] === "string" && args[0].includes("/api/analytics")) {
+        try {
+          const body = JSON.parse(args[1]?.body || "{}");
+          logEvent(`Dispatched event: <b>${body.event}</b> to path <i>${body.path}</i>`);
+        } catch {}
+      }
+      return origFetch.apply(this, args);
+    };
+
+    window.addEventListener("load", () => {
+      logEvent("Page initialized. Initial pageview sent.");
+    });
+  </script>
+</body>
+</html>

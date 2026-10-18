@@ -1,0 +1,55 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    container_name: clickpulse-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: clickpulse
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: clickpulse-grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+    volumes:
+      - ./dashboards/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./dashboards/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./dashboards/grafana/web-analytics-dashboard.json:/var/lib/grafana/dashboards/web-analytics-dashboard.json:ro
+    restart: unless-stopped
+
+  demo:
+    image: node:20-alpine
+    container_name: clickpulse-demo
+    working_dir: /app
+    ports:
+      - "8080:8080"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      CLICKHOUSE_ENDPOINT: "http://clickhouse:8123"
+    volumes:
+      - ./demo:/app/demo:ro
+      - ./public:/app/public:ro
+    command: ["node", "demo/server.mjs"]
+    restart: unless-stopped
