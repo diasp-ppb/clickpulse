@@ -218,4 +218,41 @@ describe("ClickPulse Tracker SDK", () => {
 
     expect(sentPayloads).toHaveLength(0);
   });
+
+  it("automatically tracks pageview on SPA route change via pushState", () => {
+    history.replaceState({}, "", "/home");
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: true,
+      trackSpa: true
+    });
+
+    expect(sentPayloads).toHaveLength(1);
+    expect(sentPayloads[0].path).toBe("/home");
+
+    history.pushState({}, "", "/about");
+
+    expect(sentPayloads).toHaveLength(2);
+    expect(sentPayloads[1].path).toBe("/about");
+    expect(sentPayloads[1].event).toBe("pageview");
+  });
+
+  it("does not track SPA route change if trackSpa is false", () => {
+    history.replaceState({}, "", "/home");
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: true,
+      trackSpa: false
+    });
+
+    expect(sentPayloads).toHaveLength(1);
+
+    history.pushState({}, "", "/about");
+
+    expect(sentPayloads).toHaveLength(1);
+  });
 });

@@ -56,12 +56,44 @@ var ClickPulse = (function (exports) {
     return () => document.removeEventListener("click", handleClick);
   }
 
+  // src/spa.ts
+  function registerSpaListener(onNavigate) {
+    if (typeof window === "undefined" || !window.history) {
+      return () => {
+      };
+    }
+    let lastPath = location.pathname + location.search;
+    const check = () => {
+      const cur = location.pathname + location.search;
+      if (cur !== lastPath) {
+        lastPath = cur;
+        onNavigate();
+      }
+    };
+    const origPush = history.pushState;
+    const origReplace = history.replaceState;
+    history.pushState = function(...args) {
+      origPush.apply(this, args);
+      check();
+    };
+    history.replaceState = function(...args) {
+      origReplace.apply(this, args);
+      check();
+    };
+    window.addEventListener("popstate", check);
+    return () => {
+      history.pushState = origPush;
+      history.replaceState = origReplace;
+      window.removeEventListener("popstate", check);
+    };
+  }
+
   // src/index.ts
   var defaultTracker = null;
   function init(config) {
     defaultTracker?.destroy();
-    const c = { autoPageview: true, trackOutbound: true, ...config };
-    let off;
+    const c = { autoPageview: true, trackOutbound: true, trackSpa: true, ...config };
+    const cleanups = [];
     const trackFn = (eventType, data) => {
       try {
         const { sessionId, isNewSession } = getOrCreateSessionId(c.sessionTimeoutMs);
@@ -94,17 +126,24 @@ var ClickPulse = (function (exports) {
     };
     if (c.autoPageview) {
       pageviewFn();
+      if (c.trackSpa) {
+        cleanups.push(registerSpaListener(() => pageviewFn()));
+      }
     }
     if (c.trackOutbound) {
-      off = registerOutboundClickListener(
-        (outbound) => trackFn("outbound_click", outbound),
-        c.outboundDomains
+      cleanups.push(
+        registerOutboundClickListener(
+          (outbound) => trackFn("outbound_click", outbound),
+          c.outboundDomains
+        )
       );
     }
     return defaultTracker = {
       track: trackFn,
       pageview: pageviewFn,
-      destroy: () => off?.()
+      destroy: () => {
+        cleanups.forEach((fn) => fn());
+      }
     };
   }
   function track(eventType, data) {
@@ -116,7 +155,11 @@ var ClickPulse = (function (exports) {
   if (typeof document !== "undefined") {
     const d = document.currentScript?.dataset;
     if (d?.site) {
-      const run = () => init({ siteId: d.site, endpoint: d.endpoint || "/api/analytics" });
+      const run = () => init({
+        siteId: d.site,
+        endpoint: d.endpoint || "/api/analytics",
+        trackSpa: d.spa !== "false"
+      });
       document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run, { once: true }) : run();
     }
   }

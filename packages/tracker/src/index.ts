@@ -5,11 +5,13 @@
 
 import { getOrCreateSessionId } from "./session";
 import { registerOutboundClickListener } from "./outbound";
+import { registerSpaListener } from "./spa";
 
 export interface ClickPulseConfig {
   endpoint: string;
   siteId: string;
   autoPageview?: boolean;
+  trackSpa?: boolean;
   trackOutbound?: boolean;
   outboundDomains?: string[];
   sessionTimeoutMs?: number;
@@ -40,8 +42,8 @@ let defaultTracker: ClickPulseTracker | null = null;
 export function init(config: ClickPulseConfig): ClickPulseTracker {
   defaultTracker?.destroy();
 
-  const c = { autoPageview: true, trackOutbound: true, ...config };
-  let off: (() => void) | undefined;
+  const c = { autoPageview: true, trackOutbound: true, trackSpa: true, ...config };
+  const cleanups: (() => void)[] = [];
 
   const trackFn = (eventType: string, data?: Record<string, unknown>): void => {
     try {
@@ -79,19 +81,26 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
 
   if (c.autoPageview) {
     pageviewFn();
+    if (c.trackSpa) {
+      cleanups.push(registerSpaListener(() => pageviewFn()));
+    }
   }
 
   if (c.trackOutbound) {
-    off = registerOutboundClickListener(
-      (outbound) => trackFn("outbound_click", outbound),
-      c.outboundDomains
+    cleanups.push(
+      registerOutboundClickListener(
+        (outbound) => trackFn("outbound_click", outbound),
+        c.outboundDomains
+      )
     );
   }
 
   return (defaultTracker = {
     track: trackFn,
     pageview: pageviewFn,
-    destroy: () => off?.()
+    destroy: () => {
+      cleanups.forEach((fn) => fn());
+    }
   });
 }
 
@@ -107,7 +116,12 @@ export function pageview(title?: string): void {
 if (typeof document !== "undefined") {
   const d = (document.currentScript as HTMLScriptElement | null)?.dataset;
   if (d?.site) {
-    const run = () => init({ siteId: d.site!, endpoint: d.endpoint || "/api/analytics" });
+    const run = () =>
+      init({
+        siteId: d.site!,
+        endpoint: d.endpoint || "/api/analytics",
+        trackSpa: d.spa !== "false"
+      });
     document.readyState === "loading"
       ? document.addEventListener("DOMContentLoaded", run, { once: true })
       : run();
