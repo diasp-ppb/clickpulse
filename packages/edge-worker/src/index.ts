@@ -12,6 +12,9 @@ import { validateAndSanitize } from "./schema";
 import { computeVisitorId } from "./hash";
 import { sendDirectToClickHouse } from "./clickhouse";
 import { sendOtlpLog } from "./otlp";
+import { drainD1Buffer } from "./drain";
+
+export { drainD1Buffer };
 
 export interface Env {
   DB?: D1Database;
@@ -245,6 +248,17 @@ export default {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
+    }
+  },
+
+  async scheduled(event: any, env: Env, ctx?: any): Promise<void> {
+    try {
+      const result = await drainD1Buffer(env);
+      if (result.processed > 0) {
+        console.log(`D1 automated drain: ${result.processed} events flushed to ClickHouse.`);
+      }
+    } catch (err: any) {
+      console.error("D1 automated drain error:", err.message);
     }
   }
 };

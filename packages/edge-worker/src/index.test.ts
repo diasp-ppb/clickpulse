@@ -142,4 +142,25 @@ describe("Edge Worker Ingestion Handler (index.ts)", () => {
     expect(bindMock).toHaveBeenCalledTimes(1);
     expect(runMock).toHaveBeenCalledTimes(1);
   });
+
+  it("handles scheduled cron trigger to drain D1 buffer", async () => {
+    const mockDb: any = {
+      prepare: vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({
+          all: vi.fn().mockResolvedValue({ results: [] })
+        })
+      })
+    };
+
+    const env = {
+      CLICKHOUSE_ENDPOINT: "https://clickhouse.example.com",
+      DB: mockDb
+    };
+
+    await expect(
+      worker.scheduled({ scheduledTime: Date.now(), cron: "*/10 * * * *" }, env)
+    ).resolves.not.toThrow();
+
+    expect(mockDb.prepare).toHaveBeenCalledTimes(1);
+  });
 });
