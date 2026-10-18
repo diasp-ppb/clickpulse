@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateAndSanitize } from "./schema";
+import { validateAndSanitize, isBot } from "./schema";
 
 describe("Edge Worker Schema Validation & Sanitization", () => {
   const createMockRequest = (headers: Record<string, string> = {}) => {
@@ -154,5 +154,79 @@ describe("Edge Worker Schema Validation & Sanitization", () => {
       expect(Object.keys(parsed).length).toBeLessThanOrEqual(10);
       expect(parsed["nested_obj"]).toBeUndefined();
     }
+  });
+
+  describe("Bot Detection (isBot)", () => {
+    it("flags known bot and scraper user-agents", () => {
+      const botUas = [
+        "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+        "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)",
+        "Mozilla/5.0 HeadlessChrome/120.0.0.0 Safari/537.36",
+        "Python-requests/2.31.0",
+        "curl/7.88.1",
+        "SemrushBot/7~bl",
+        "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+        "Twitterbot/1.0"
+      ];
+
+      for (const ua of botUas) {
+        expect(isBot(ua)).toBe(true);
+      }
+    });
+
+    it("does not flag regular browser user-agents", () => {
+      const humanUas = [
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
+      ];
+
+      for (const ua of humanUas) {
+        expect(isBot(ua)).toBe(false);
+      }
+    });
+
+    it("detects bot from Cloudflare botManagement score and verifiedBot", () => {
+      const regularUa = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+
+      // Verified bot
+      const verifiedBotReq = new Request("https://edge.clickpulse.io/api/analytics");
+      (verifiedBotReq as any).cf = { botManagement: { verifiedBot: true } };
+      expect(isBot(regularUa, verifiedBotReq)).toBe(true);
+
+      // Low trust score (< 30)
+      const lowScoreReq = new Request("https://edge.clickpulse.io/api/analytics");
+      (lowScoreReq as any).cf = { botManagement: { score: 10 } };
+      expect(isBot(regularUa, lowScoreReq)).toBe(true);
+
+      // High trust score (>= 30)
+      const highScoreReq = new Request("https://edge.clickpulse.io/api/analytics");
+      (highScoreReq as any).cf = { botManagement: { score: 99 } };
+      expect(isBot(regularUa, highScoreReq)).toBe(false);
+    });
+
+    it("attaches is_bot: true to event_data when bot is detected", () => {
+      const botReq = createMockRequest({
+        "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+      });
+
+      const result = validateAndSanitize(
+        {
+          site_id: "example.com",
+          session_id: "123",
+          event: "pageview",
+          ts: Date.now()
+        },
+        botReq
+      );
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        expect(result.isBot).toBe(true);
+        const parsed = JSON.parse(result.event.event_data);
+        expect(parsed.is_bot).toBe(true);
+      }
+    });
   });
 });

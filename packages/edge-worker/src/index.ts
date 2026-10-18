@@ -17,6 +17,7 @@ export interface Env {
   DB?: D1Database;
   SALT_SECRET?: string;
   ALLOWED_ORIGINS?: string;
+  DROP_BOTS?: string; // "true" (default) to silently drop bot events with 200, or "false" to ingest with is_bot flag
 
   // Direct Protected ClickHouse Ingestion (Primary)
   CLICKHOUSE_ENDPOINT?: string; // e.g., "https://clickhouse.yourdomain.com"
@@ -135,6 +136,14 @@ export default {
       if (!validation.valid) {
         return new Response(JSON.stringify({ error: validation.reason }), {
           status: 422,
+          headers: { "Content-Type": "application/json", ...corsHeaders }
+        });
+      }
+
+      // 4.1 Bot Filtering: Protect ClickHouse/D1 from automated crawlers & scrapers
+      if (validation.isBot && env.DROP_BOTS !== "false") {
+        return new Response(JSON.stringify({ success: true, filtered: "bot" }), {
+          status: 200,
           headers: { "Content-Type": "application/json", ...corsHeaders }
         });
       }
