@@ -56,12 +56,40 @@ var ClickPulse = (function (exports) {
     return () => document.removeEventListener("click", handleClick);
   }
 
+  // src/declarative.ts
+  function registerDeclarativeEventsListener(trackFn) {
+    if (typeof document === "undefined") {
+      return () => {
+      };
+    }
+    function handleClick(e) {
+      const el = e.target?.closest?.(
+        "[data-clickpulse],[data-clickpulse-event]"
+      );
+      if (!el) return;
+      const eventName = el.dataset.clickpulse || el.dataset.clickpulseEvent;
+      if (!eventName) return;
+      let props;
+      for (const [key, val] of Object.entries(el.dataset)) {
+        if (key !== "clickpulse" && key !== "clickpulseEvent" && val !== void 0) {
+          if (!props) props = {};
+          const cleanKey = key.replace(/^clickpulse|^prop/, "");
+          const finalKey = cleanKey ? cleanKey.charAt(0).toLowerCase() + cleanKey.slice(1) : key;
+          props[finalKey] = val;
+        }
+      }
+      trackFn(eventName, props);
+    }
+    document.addEventListener("click", handleClick, { passive: true });
+    return () => document.removeEventListener("click", handleClick);
+  }
+
   // src/index.ts
   var defaultTracker = null;
   function init(config) {
     defaultTracker?.destroy();
-    const c = { autoPageview: true, trackOutbound: true, ...config };
-    let off;
+    const c = { autoPageview: true, trackOutbound: true, trackDeclarative: true, ...config };
+    const cleanups = [];
     const trackFn = (eventType, data) => {
       try {
         const { sessionId, isNewSession } = getOrCreateSessionId(c.sessionTimeoutMs);
@@ -96,15 +124,22 @@ var ClickPulse = (function (exports) {
       pageviewFn();
     }
     if (c.trackOutbound) {
-      off = registerOutboundClickListener(
-        (outbound) => trackFn("outbound_click", outbound),
-        c.outboundDomains
+      cleanups.push(
+        registerOutboundClickListener(
+          (outbound) => trackFn("outbound_click", outbound),
+          c.outboundDomains
+        )
       );
+    }
+    if (c.trackDeclarative) {
+      cleanups.push(registerDeclarativeEventsListener(trackFn));
     }
     return defaultTracker = {
       track: trackFn,
       pageview: pageviewFn,
-      destroy: () => off?.()
+      destroy: () => {
+        cleanups.forEach((fn) => fn());
+      }
     };
   }
   function track(eventType, data) {
@@ -116,7 +151,11 @@ var ClickPulse = (function (exports) {
   if (typeof document !== "undefined") {
     const d = document.currentScript?.dataset;
     if (d?.site) {
-      const run = () => init({ siteId: d.site, endpoint: d.endpoint || "/api/analytics" });
+      const run = () => init({
+        siteId: d.site,
+        endpoint: d.endpoint || "/api/analytics",
+        trackDeclarative: d.declarative !== "false"
+      });
       document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run, { once: true }) : run();
     }
   }
