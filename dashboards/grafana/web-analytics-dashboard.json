@@ -84,6 +84,32 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "id": 7,
+      "title": "Top Acquisition Channels",
+      "type": "table",
+      "targets": [
+        {
+          "rawSql": "SELECT channel, sum(pageviews) AS pageviews, uniqMerge(sessions_state) AS sessions FROM clickpulse.daily_sources WHERE site_id = '$site_id' AND $__timeFilter(date) GROUP BY channel ORDER BY sessions DESC LIMIT 10",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "id": 8,
+      "title": "Top UTM Campaigns",
+      "type": "table",
+      "targets": [
+        {
+          "rawSql": "SELECT concat(utm_source, ' / ', utm_medium) AS source_medium, utm_campaign, sum(pageviews) AS pageviews, uniqMerge(sessions_state) AS sessions FROM clickpulse.daily_sources WHERE site_id = '$site_id' AND utm_source != '' AND $__timeFilter(date) GROUP BY source_medium, utm_campaign ORDER BY sessions DESC LIMIT 10",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "schemaVersion": 38,

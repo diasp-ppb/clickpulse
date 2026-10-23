@@ -262,3 +262,24 @@ ORDER BY sessions DESC
 LIMIT 25;
 ```
 
+### D. Instant Bounce Rate & Average Session Duration (from `daily_session_stats`)
+```sql
+SELECT
+    count() AS total_sessions,
+    countIf(total_hits = 1) AS bounced_sessions,
+    round(countIf(total_hits = 1) * 100.0 / count(), 2) AS bounce_rate_pct,
+    round(avg(duration_seconds), 1) AS avg_duration_seconds
+FROM
+(
+    SELECT
+        session_id,
+        sum(hits) AS total_hits,
+        dateDiff('second', min(first_seen), max(last_seen)) AS duration_seconds
+    FROM clickpulse.daily_session_stats
+    WHERE site_id = 'example.com'
+      AND date >= today() - 30
+    GROUP BY session_id
+);
+```
+
+
