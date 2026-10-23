@@ -24,6 +24,15 @@ describe("SPA Navigation Tracking", () => {
     expect(location.pathname).toBe("/dashboard");
   });
 
+  it("passes the new pathname to the callback", () => {
+    const onNavigate = vi.fn();
+    cleanup = registerSpaListener(onNavigate);
+
+    history.pushState({}, "", "/dashboard");
+
+    expect(onNavigate).toHaveBeenCalledWith("/dashboard");
+  });
+
   it("triggers callback when history.pushState changes search query", () => {
     const onNavigate = vi.fn();
     cleanup = registerSpaListener(onNavigate);

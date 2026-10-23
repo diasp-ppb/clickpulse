@@ -256,6 +256,7 @@ init({
   siteId: 'my-first-site',
   endpoint: 'https://analytics.yourdomain.com/api/analytics',
   autoPageview: true,
+  trackSpa: true, // Client-side route tracking (defaults to autoPageview)
   trackOutbound: true,
   outboundDomains: ['partner-domain.com'] // Auto-tracks affiliate/outbound clicks
 });
@@ -263,6 +264,25 @@ init({
 // Custom event tracking
 track('search', { query: 'Iceland', min_price: 1500 });
 ```
+
+#### SPA Route Transitions
+
+When `autoPageview` is enabled (the default), the tracker also listens for
+client-side navigation through `history.pushState`, `history.replaceState`, and
+`popstate`, so frameworks like Next.js, React Router, SvelteKit, and Nuxt report
+pageviews without a full reload. Disable it with `trackSpa: false` (or
+`data-spa="false"` on the script tag embed).
+
+- **Path-based routers only.** Hash routing (`example.com/#/dashboard`) is not
+  detected automatically. Call `pageview()` from your router's navigation hook if
+  you need it.
+- **Title timing.** The pageview is sent on the next macrotask so frameworks can
+  update `document.title` first. Apps that set the title asynchronously can call
+  `pageview('Custom Title')` manually.
+- **History patching.** While active, the tracker wraps `history.pushState` and
+  `history.replaceState` and restores the originals on `destroy()`. If another
+  library also patches the History API, initialize ClickPulse after it and mind the
+  initialization order.
 
 ---
 

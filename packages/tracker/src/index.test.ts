@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { init, track, pageview, ClickPulseTracker } from "./index";
 
+// SPA pageviews are deferred one macrotask so frameworks can update document.title.
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 describe("ClickPulse Tracker SDK", () => {
   let trackerInstance: ClickPulseTracker | undefined;
   let sentPayloads: Array<Record<string, unknown>> = [];
@@ -219,7 +222,7 @@ describe("ClickPulse Tracker SDK", () => {
     expect(sentPayloads).toHaveLength(0);
   });
 
-  it("automatically tracks pageview on SPA route change via pushState", () => {
+  it("automatically tracks pageview on SPA route change via pushState", async () => {
     history.replaceState({}, "", "/home");
 
     trackerInstance = init({
@@ -233,13 +236,14 @@ describe("ClickPulse Tracker SDK", () => {
     expect(sentPayloads[0].path).toBe("/home");
 
     history.pushState({}, "", "/about");
+    await flush();
 
     expect(sentPayloads).toHaveLength(2);
     expect(sentPayloads[1].path).toBe("/about");
     expect(sentPayloads[1].event).toBe("pageview");
   });
 
-  it("does not track SPA route change if trackSpa is false", () => {
+  it("does not track SPA route change if trackSpa is false", async () => {
     history.replaceState({}, "", "/home");
 
     trackerInstance = init({
@@ -252,6 +256,105 @@ describe("ClickPulse Tracker SDK", () => {
     expect(sentPayloads).toHaveLength(1);
 
     history.pushState({}, "", "/about");
+    await flush();
+
+    expect(sentPayloads).toHaveLength(1);
+  });
+
+  it("captures document.title after the framework updates it on SPA navigation", async () => {
+    history.replaceState({}, "", "/home");
+    document.title = "Home";
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: true,
+      trackSpa: true
+    });
+
+    expect(sentPayloads).toHaveLength(1);
+
+    // Routers usually call pushState before setting the document title.
+    history.pushState({}, "", "/about");
+    document.title = "About";
+
+    await flush();
+
+    expect(sentPayloads).toHaveLength(2);
+    expect(sentPayloads[1].path).toBe("/about");
+    expect(sentPayloads[1].data).toEqual(
+      expect.objectContaining({ title: "About" })
+    );
+  });
+
+  it("records the correct path for rapid consecutive SPA navigations", async () => {
+    history.replaceState({}, "", "/home");
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: true,
+      trackSpa: true
+    });
+
+    history.pushState({}, "", "/a");
+    history.pushState({}, "", "/b");
+    await flush();
+
+    expect(sentPayloads.map((p) => p.path)).toEqual(["/home", "/a", "/b"]);
+  });
+
+  it("tracks SPA navigation when autoPageview is false but trackSpa is true", async () => {
+    history.replaceState({}, "", "/home");
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: false,
+      trackSpa: true
+    });
+
+    expect(sentPayloads).toHaveLength(0);
+
+    history.pushState({}, "", "/about");
+    await flush();
+
+    expect(sentPayloads).toHaveLength(1);
+    expect(sentPayloads[0].path).toBe("/about");
+  });
+
+  it("does not track SPA navigation when autoPageview is false and trackSpa is unset", async () => {
+    history.replaceState({}, "", "/home");
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: false
+    });
+
+    expect(sentPayloads).toHaveLength(0);
+
+    history.pushState({}, "", "/about");
+    await flush();
+
+    expect(sentPayloads).toHaveLength(0);
+  });
+
+  it("drops a pending SPA pageview if destroy() runs before it flushes", async () => {
+    history.replaceState({}, "", "/home");
+
+    trackerInstance = init({
+      endpoint: "/api/analytics",
+      siteId: "my-site",
+      autoPageview: true,
+      trackSpa: true
+    });
+
+    expect(sentPayloads).toHaveLength(1);
+
+    history.pushState({}, "", "/about");
+    trackerInstance.destroy();
+    await flush();
 
     expect(sentPayloads).toHaveLength(1);
   });

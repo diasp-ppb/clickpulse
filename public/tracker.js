@@ -64,10 +64,11 @@ var ClickPulse = (function (exports) {
     }
     let lastPath = location.pathname + location.search;
     const check = () => {
-      const cur = location.pathname + location.search;
+      const path = location.pathname;
+      const cur = path + location.search;
       if (cur !== lastPath) {
         lastPath = cur;
-        onNavigate();
+        onNavigate(path);
       }
     };
     const origPush = history.pushState;
@@ -92,9 +93,11 @@ var ClickPulse = (function (exports) {
   var defaultTracker = null;
   function init(config) {
     defaultTracker?.destroy();
-    const c = { autoPageview: true, trackOutbound: true, trackSpa: true, ...config };
+    const c = { autoPageview: true, trackOutbound: true, ...config };
+    const trackSpa = config.trackSpa ?? c.autoPageview;
     const cleanups = [];
-    const trackFn = (eventType, data) => {
+    let alive = true;
+    const trackFn = (eventType, data, path) => {
       try {
         const { sessionId, isNewSession } = getOrCreateSessionId(c.sessionTimeoutMs);
         const urlParams = new URLSearchParams(location.search);
@@ -102,7 +105,7 @@ var ClickPulse = (function (exports) {
           site_id: c.siteId,
           session_id: sessionId,
           event: eventType.slice(0, 50),
-          path: location.pathname.slice(0, 255),
+          path: (path ?? location.pathname).slice(0, 255),
           referrer: document.referrer.slice(0, 500) || null,
           ts: Date.now()
         };
@@ -121,14 +124,20 @@ var ClickPulse = (function (exports) {
       } catch {
       }
     };
-    const pageviewFn = (title) => {
-      trackFn("pageview", { title: title || document.title });
+    const pageviewFn = (title, path) => {
+      trackFn("pageview", { title: title || document.title }, path);
     };
     if (c.autoPageview) {
       pageviewFn();
-      if (c.trackSpa) {
-        cleanups.push(registerSpaListener(() => pageviewFn()));
-      }
+    }
+    if (trackSpa) {
+      cleanups.push(
+        registerSpaListener((path) => {
+          setTimeout(() => {
+            if (alive) pageviewFn(void 0, path);
+          }, 0);
+        })
+      );
     }
     if (c.trackOutbound) {
       cleanups.push(
@@ -139,9 +148,10 @@ var ClickPulse = (function (exports) {
       );
     }
     return defaultTracker = {
-      track: trackFn,
-      pageview: pageviewFn,
+      track: (eventType, data) => trackFn(eventType, data),
+      pageview: (title) => pageviewFn(title),
       destroy: () => {
+        alive = false;
         cleanups.forEach((fn) => fn());
       }
     };

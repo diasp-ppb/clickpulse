@@ -42,10 +42,16 @@ let defaultTracker: ClickPulseTracker | null = null;
 export function init(config: ClickPulseConfig): ClickPulseTracker {
   defaultTracker?.destroy();
 
-  const c = { autoPageview: true, trackOutbound: true, trackSpa: true, ...config };
+  const c = { autoPageview: true, trackOutbound: true, ...config };
+  const trackSpa = config.trackSpa ?? c.autoPageview;
   const cleanups: (() => void)[] = [];
+  let alive = true;
 
-  const trackFn = (eventType: string, data?: Record<string, unknown>): void => {
+  const trackFn = (
+    eventType: string,
+    data?: Record<string, unknown>,
+    path?: string
+  ): void => {
     try {
       const { sessionId, isNewSession } = getOrCreateSessionId(c.sessionTimeoutMs);
       const urlParams = new URLSearchParams(location.search);
@@ -54,7 +60,7 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
         site_id: c.siteId,
         session_id: sessionId,
         event: eventType.slice(0, 50),
-        path: location.pathname.slice(0, 255),
+        path: (path ?? location.pathname).slice(0, 255),
         referrer: document.referrer.slice(0, 500) || null,
         ts: Date.now()
       };
@@ -75,15 +81,23 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
     } catch {}
   };
 
-  const pageviewFn = (title?: string): void => {
-    trackFn("pageview", { title: title || document.title });
+  const pageviewFn = (title?: string, path?: string): void => {
+    trackFn("pageview", { title: title || document.title }, path);
   };
 
   if (c.autoPageview) {
     pageviewFn();
-    if (c.trackSpa) {
-      cleanups.push(registerSpaListener(() => pageviewFn()));
-    }
+  }
+
+  if (trackSpa) {
+    cleanups.push(
+      registerSpaListener((path) => {
+        // Defer one macrotask so frameworks can update document.title first.
+        setTimeout(() => {
+          if (alive) pageviewFn(undefined, path);
+        }, 0);
+      })
+    );
   }
 
   if (c.trackOutbound) {
@@ -96,9 +110,10 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
   }
 
   return (defaultTracker = {
-    track: trackFn,
-    pageview: pageviewFn,
+    track: (eventType, data) => trackFn(eventType, data),
+    pageview: (title) => pageviewFn(title),
     destroy: () => {
+      alive = false;
       cleanups.forEach((fn) => fn());
     }
   });
