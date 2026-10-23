@@ -5,11 +5,13 @@
 
 import { getOrCreateSessionId } from "./session";
 import { registerOutboundClickListener } from "./outbound";
+import { registerSpaListener } from "./spa";
 
 export interface ClickPulseConfig {
   endpoint: string;
   siteId: string;
   autoPageview?: boolean;
+  trackSpa?: boolean;
   trackOutbound?: boolean;
   outboundDomains?: string[];
   sessionTimeoutMs?: number;
@@ -41,9 +43,15 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
   defaultTracker?.destroy();
 
   const c = { autoPageview: true, trackOutbound: true, ...config };
-  let off: (() => void) | undefined;
+  const trackSpa = config.trackSpa ?? c.autoPageview;
+  const cleanups: (() => void)[] = [];
+  let alive = true;
 
-  const trackFn = (eventType: string, data?: Record<string, unknown>): void => {
+  const trackFn = (
+    eventType: string,
+    data?: Record<string, unknown>,
+    path?: string
+  ): void => {
     try {
       const { sessionId, isNewSession } = getOrCreateSessionId(c.sessionTimeoutMs);
       const urlParams = new URLSearchParams(location.search);
@@ -52,7 +60,7 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
         site_id: c.siteId,
         session_id: sessionId,
         event: eventType.slice(0, 50),
-        path: location.pathname.slice(0, 255),
+        path: (path ?? location.pathname).slice(0, 255),
         referrer: document.referrer.slice(0, 500) || null,
         ts: Date.now()
       };
@@ -73,25 +81,41 @@ export function init(config: ClickPulseConfig): ClickPulseTracker {
     } catch {}
   };
 
-  const pageviewFn = (title?: string): void => {
-    trackFn("pageview", { title: title || document.title });
+  const pageviewFn = (title?: string, path?: string): void => {
+    trackFn("pageview", { title: title || document.title }, path);
   };
 
   if (c.autoPageview) {
     pageviewFn();
   }
 
+  if (trackSpa) {
+    cleanups.push(
+      registerSpaListener((path) => {
+        // Defer one macrotask so frameworks can update document.title first.
+        setTimeout(() => {
+          if (alive) pageviewFn(undefined, path);
+        }, 0);
+      })
+    );
+  }
+
   if (c.trackOutbound) {
-    off = registerOutboundClickListener(
-      (outbound) => trackFn("outbound_click", outbound),
-      c.outboundDomains
+    cleanups.push(
+      registerOutboundClickListener(
+        (outbound) => trackFn("outbound_click", outbound),
+        c.outboundDomains
+      )
     );
   }
 
   return (defaultTracker = {
-    track: trackFn,
-    pageview: pageviewFn,
-    destroy: () => off?.()
+    track: (eventType, data) => trackFn(eventType, data),
+    pageview: (title) => pageviewFn(title),
+    destroy: () => {
+      alive = false;
+      cleanups.forEach((fn) => fn());
+    }
   });
 }
 
@@ -107,7 +131,12 @@ export function pageview(title?: string): void {
 if (typeof document !== "undefined") {
   const d = (document.currentScript as HTMLScriptElement | null)?.dataset;
   if (d?.site) {
-    const run = () => init({ siteId: d.site!, endpoint: d.endpoint || "/api/analytics" });
+    const run = () =>
+      init({
+        siteId: d.site!,
+        endpoint: d.endpoint || "/api/analytics",
+        trackSpa: d.spa !== "false"
+      });
     document.readyState === "loading"
       ? document.addEventListener("DOMContentLoaded", run, { once: true })
       : run();
