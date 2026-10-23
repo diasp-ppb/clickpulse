@@ -61,19 +61,21 @@ describe("SPA Navigation Tracking", () => {
     expect(location.pathname).toBe("/replaced-path");
   });
 
-  it("triggers callback on window popstate event", () => {
+  it("triggers callback on real browser back/forward traversal", () => {
     const onNavigate = vi.fn();
     cleanup = registerSpaListener(onNavigate);
 
-    // Simulate back/forward navigation
-    history.pushState({}, "", "/next-page");
-    expect(onNavigate).toHaveBeenCalledTimes(1);
+    history.pushState({}, "", "/a");
+    history.pushState({}, "", "/b");
+    history.back();
+    history.forward();
 
-    // Manually dispatch popstate after changing location
-    history.replaceState({}, "", "/previous-page");
-    window.dispatchEvent(new PopStateEvent("popstate"));
-
-    expect(onNavigate).toHaveBeenCalledTimes(2);
+    expect(onNavigate.mock.calls.map((c) => c[0])).toEqual([
+      "/a",
+      "/b",
+      "/a",
+      "/b"
+    ]);
   });
 
   it("restores original history methods and removes event listener on cleanup", () => {

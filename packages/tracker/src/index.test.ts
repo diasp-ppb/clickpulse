@@ -358,4 +358,98 @@ describe("ClickPulse Tracker SDK", () => {
 
     expect(sentPayloads).toHaveLength(1);
   });
+
+  describe("framework navigation patterns", () => {
+    const initTracker = () =>
+      init({
+        endpoint: "/api/analytics",
+        siteId: "my-site",
+        autoPageview: true,
+        trackSpa: true
+      });
+
+    it("ignores a replaceState with the same path (scroll restoration / hydration)", async () => {
+      history.replaceState({}, "", "/home");
+      trackerInstance = initTracker();
+      expect(sentPayloads).toHaveLength(1);
+
+      // Next.js / SvelteKit often restore scroll or normalise the URL on mount.
+      history.replaceState({ ...history.state, scrollY: 0 }, "", "/home");
+      await flush();
+
+      expect(sentPayloads).toHaveLength(1);
+    });
+
+    it("counts one pageview when a router calls pushState then replaceState", async () => {
+      history.replaceState({}, "", "/home");
+      trackerInstance = initTracker();
+      expect(sentPayloads).toHaveLength(1);
+
+      // SvelteKit / React Router may replace the entry right after pushing it.
+      history.pushState({}, "", "/dashboard");
+      history.replaceState({}, "", "/dashboard");
+      await flush();
+
+      expect(sentPayloads.map((p) => p.path)).toEqual(["/home", "/dashboard"]);
+    });
+
+    it("tracks real back and forward traversal through popstate", async () => {
+      history.replaceState({}, "", "/home");
+      trackerInstance = initTracker();
+      expect(sentPayloads).toHaveLength(1);
+
+      history.pushState({}, "", "/a");
+      history.pushState({}, "", "/b");
+      await flush();
+      expect(sentPayloads.map((p) => p.path)).toEqual(["/home", "/a", "/b"]);
+
+      history.back();
+      await flush();
+      expect(sentPayloads.map((p) => p.path)).toEqual([
+        "/home",
+        "/a",
+        "/b",
+        "/a"
+      ]);
+
+      history.forward();
+      await flush();
+      expect(sentPayloads.map((p) => p.path)).toEqual([
+        "/home",
+        "/a",
+        "/b",
+        "/a",
+        "/b"
+      ]);
+    });
+
+    it("ignores hash-only navigation (documented limitation)", async () => {
+      history.replaceState({}, "", "/home");
+      trackerInstance = initTracker();
+
+      history.pushState({}, "", "/about");
+      await flush();
+      expect(sentPayloads).toHaveLength(2);
+
+      // Anchor and hash-router changes must not create pageviews.
+      history.pushState({}, "", "/about#team");
+      location.hash = "#pricing";
+      await flush();
+
+      expect(sentPayloads).toHaveLength(2);
+    });
+
+    it("does not double-register listeners when init() is called twice", async () => {
+      history.replaceState({}, "", "/home");
+      trackerInstance = initTracker();
+      trackerInstance = initTracker();
+      expect(sentPayloads).toHaveLength(2); // one initial pageview per init()
+
+      history.pushState({}, "", "/about");
+      await flush();
+
+      // A single navigation must produce exactly one new pageview.
+      expect(sentPayloads).toHaveLength(3);
+    });
+  });
 });
