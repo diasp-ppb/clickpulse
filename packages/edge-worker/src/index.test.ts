@@ -157,9 +157,14 @@ describe("Edge Worker Ingestion Handler (index.ts)", () => {
       DB: mockDb
     };
 
-    await expect(
-      worker.scheduled({ scheduledTime: Date.now(), cron: "*/10 * * * *" }, env)
-    ).resolves.not.toThrow();
+    const controller = {
+      scheduledTime: Date.now(),
+      cron: "*/10 * * * *",
+      noRetry: vi.fn(),
+      waitUntil: vi.fn()
+    } as unknown as ScheduledController;
+
+    await expect(worker.scheduled(controller, env)).resolves.toBeUndefined();
 
     expect(mockDb.prepare).toHaveBeenCalledTimes(1);
   });

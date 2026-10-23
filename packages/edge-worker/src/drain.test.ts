@@ -1,171 +1,206 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { drainD1Buffer } from "./drain";
-import { Env } from "./index";
+import type { Env } from "./env";
+
+function makeRow(id: number, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    created_at: "2026-10-18T20:00:00.000Z",
+    site_id: "site-a",
+    event_type: "pageview",
+    visitor_id: "vis-1",
+    session_id: "sess-1",
+    path: "/docs",
+    referrer: "",
+    utm_source: "",
+    utm_medium: "",
+    utm_campaign: "",
+    country: "PT",
+    device_type: "desktop",
+    browser: "Chrome",
+    event_data: "{}",
+    ...overrides
+  };
+}
+
+function makeDb(
+  batches: any[][],
+  opts: { deleteError?: Error; selectError?: Error } = {}
+) {
+  const queue = [...batches];
+
+  const deleteRun = vi.fn().mockImplementation(async () => {
+    if (opts.deleteError) throw opts.deleteError;
+    return { success: true };
+  });
+  const deleteBind = vi.fn().mockReturnValue({ run: deleteRun });
+
+  const selectAll = vi.fn().mockImplementation(async () => {
+    if (opts.selectError) throw opts.selectError;
+    return { results: queue.length > 0 ? queue.shift() : [] };
+  });
+
+  const prepare = vi.fn().mockImplementation((sql: string) => {
+    if (sql.includes("SELECT")) {
+      return { bind: vi.fn().mockReturnValue({ all: selectAll }) };
+    }
+    return { bind: deleteBind };
+  });
+
+  return { db: { prepare } as any, prepare, selectAll, deleteBind, deleteRun };
+}
+
+function baseEnv(overrides: Partial<Env> = {}): Env {
+  return {
+    CLICKHOUSE_ENDPOINT: "https://clickhouse.example.com",
+    CLICKHOUSE_USER: "sync_worker",
+    CLICKHOUSE_PASSWORD: "secret_password",
+    CF_ACCESS_CLIENT_ID: "cf-id",
+    CF_ACCESS_CLIENT_SECRET: "cf-secret",
+    ...overrides
+  };
+}
 
 describe("D1 Spool Buffer Drain (drain.ts)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("returns processed: 0 if D1 database or ClickHouse endpoint is not configured", async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("fails safely when D1 or the ClickHouse endpoint is not configured", async () => {
     const resNoDb = await drainD1Buffer({ CLICKHOUSE_ENDPOINT: "https://clickhouse.example.com" });
-    expect(resNoDb).toEqual({ processed: 0, success: false });
+    expect(resNoDb.success).toBe(false);
+    expect(resNoDb.processed).toBe(0);
+    expect(resNoDb.error).toContain("D1");
 
     const resNoCh = await drainD1Buffer({ DB: {} as any });
-    expect(resNoCh).toEqual({ processed: 0, success: false });
+    expect(resNoCh.success).toBe(false);
+    expect(resNoCh.processed).toBe(0);
+    expect(resNoCh.error).toContain("ClickHouse");
   });
 
-  it("returns processed: 0 and success: true when no records are in D1 buffer", async () => {
-    const mockDb: any = {
-      prepare: vi.fn().mockReturnValue({
-        bind: vi.fn().mockReturnValue({
-          all: vi.fn().mockResolvedValue({ results: [] })
-        })
-      })
-    };
+  it("returns success when no records are in the D1 buffer", async () => {
+    const { db, prepare } = makeDb([[]]);
 
-    const env: Env = {
-      DB: mockDb,
-      CLICKHOUSE_ENDPOINT: "https://clickhouse.example.com"
-    };
+    const res = await drainD1Buffer(baseEnv({ DB: db }));
 
-    const res = await drainD1Buffer(env);
-    expect(res).toEqual({ processed: 0, success: true });
-    expect(mockDb.prepare).toHaveBeenCalledTimes(1);
+    expect(res).toEqual({ processed: 0, batches: 0, success: true, hasMore: false });
+    expect(prepare).toHaveBeenCalledTimes(1);
   });
 
-  it("drains buffered events, posts to ClickHouse, and deletes processed rows from D1", async () => {
-    const mockRecords = [
-      {
-        id: 101,
-        created_at: "2026-10-18 20:00:00.000",
-        site_id: "site-a",
-        event_type: "pageview",
-        visitor_id: "vis-1",
-        session_id: "sess-1",
-        path: "/docs",
-        referrer: "",
-        utm_source: "",
-        utm_medium: "",
-        utm_campaign: "",
-        country: "PT",
-        device_type: "desktop",
-        browser: "Chrome",
-        event_data: "{}"
-      },
-      {
-        id: 102,
-        created_at: "2026-10-18 20:01:00.000",
-        site_id: "site-a",
-        event_type: "pageview",
-        visitor_id: "vis-2",
-        session_id: "sess-2",
-        path: "/pricing",
-        referrer: "",
-        utm_source: "google",
-        utm_medium: "cpc",
-        utm_campaign: "launch",
-        country: "US",
-        device_type: "mobile",
-        browser: "Safari",
-        event_data: "{}"
-      }
-    ];
+  it("drains a batch, waits for ClickHouse to persist it, then clears the spool", async () => {
+    const { db, deleteBind, deleteRun } = makeDb([[makeRow(101), makeRow(102, { path: "/pricing" })], []]);
 
-    const deleteRunMock = vi.fn().mockResolvedValue({ success: true });
-    const deleteBindMock = vi.fn().mockReturnValue({ run: deleteRunMock });
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
 
-    const selectAllMock = vi.fn().mockResolvedValue({ results: mockRecords });
-    const selectBindMock = vi.fn().mockReturnValue({ all: selectAllMock });
+    const res = await drainD1Buffer(baseEnv({ DB: db }));
 
-    const prepareMock = vi.fn().mockImplementation((query: string) => {
-      if (query.includes("SELECT")) {
-        return { bind: selectBindMock };
-      }
-      if (query.includes("DELETE")) {
-        return { bind: deleteBindMock };
-      }
-      return {};
-    });
-
-    const mockDb: any = { prepare: prepareMock };
-
-    // Mock global fetch for ClickHouse call
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(null, { status: 200 })
-    );
-
-    const env: Env = {
-      DB: mockDb,
-      CLICKHOUSE_ENDPOINT: "https://clickhouse.example.com",
-      CLICKHOUSE_USER: "sync_worker",
-      CLICKHOUSE_PASSWORD: "secret_password",
-      CF_ACCESS_CLIENT_ID: "cf-id",
-      CF_ACCESS_CLIENT_SECRET: "cf-secret"
-    };
-
-    const res = await drainD1Buffer(env, 100);
-
-    expect(res).toEqual({ processed: 2, success: true });
+    expect(res).toEqual({ processed: 2, batches: 1, success: true, hasMore: false });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    // Verify request payload sent to ClickHouse
-    const [url, reqOptions] = fetchSpy.mock.calls[0];
+    const [url, reqOptions] = fetchSpy.mock.calls[0] as [string, any];
     expect(url).toContain("https://clickhouse.example.com/?query=INSERT+INTO+clickpulse.analytics_events");
     expect(url).toContain("async_insert=1");
-    expect((reqOptions as any).headers["CF-Access-Client-Id"]).toBe("cf-id");
-    expect((reqOptions as any).headers["X-ClickHouse-User"]).toBe("sync_worker");
+    // Critical: the spooled row is the only remaining copy, so the insert must
+    // be acknowledged by ClickHouse before deletion.
+    expect(url).toContain("wait_for_async_insert=1");
+    expect(reqOptions.headers["CF-Access-Client-Id"]).toBe("cf-id");
+    expect(reqOptions.headers["X-ClickHouse-User"]).toBe("sync_worker");
 
-    const lines = (reqOptions as any).body.split("\n");
+    const lines = reqOptions.body.split("\n");
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0]).path).toBe("/docs");
     expect(JSON.parse(lines[1]).path).toBe("/pricing");
 
-    // Verify deletion called up to max id (102)
-    expect(deleteBindMock).toHaveBeenCalledWith(102);
-    expect(deleteRunMock).toHaveBeenCalledTimes(1);
+    expect(deleteBind).toHaveBeenCalledWith(101, 102);
+    expect(deleteRun).toHaveBeenCalledTimes(1);
   });
 
-  it("does not delete records from D1 if ClickHouse responds with an error", async () => {
-    const mockRecords = [
-      {
-        id: 50,
-        created_at: "2026-10-18 20:00:00.000",
-        site_id: "site-a",
-        event_type: "pageview",
-        visitor_id: "vis-1",
-        session_id: "sess-1",
-        path: "/",
-        event_data: "{}"
-      }
-    ];
-
-    const deleteRunMock = vi.fn();
-    const selectAllMock = vi.fn().mockResolvedValue({ results: mockRecords });
-
-    const prepareMock = vi.fn().mockImplementation((query: string) => {
-      if (query.includes("SELECT")) {
-        return { bind: () => ({ all: selectAllMock }) };
-      }
-      return { bind: () => ({ run: deleteRunMock }) };
-    });
-
-    const mockDb: any = { prepare: prepareMock };
-
-    // ClickHouse responds 500 error
+  it("keeps records in D1 when ClickHouse responds with an error", async () => {
+    const { db, deleteRun } = makeDb([[makeRow(50)]]);
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("ClickHouse Out of Memory", { status: 500 })
     );
 
-    const env: Env = {
-      DB: mockDb,
-      CLICKHOUSE_ENDPOINT: "https://clickhouse.example.com"
-    };
-
-    const res = await drainD1Buffer(env);
+    const res = await drainD1Buffer(baseEnv({ DB: db }));
 
     expect(res.processed).toBe(0);
     expect(res.success).toBe(false);
-    expect(deleteRunMock).not.toHaveBeenCalled();
+    expect(res.hasMore).toBe(true);
+    expect(res.error).toContain("HTTP 500");
+    expect(deleteRun).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed run if D1 cleanup fails after a successful insert", async () => {
+    const { db, selectAll } = makeDb([[makeRow(7), makeRow(8)]], {
+      deleteError: new Error("D1 write quota exceeded")
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 200 }));
+
+    const res = await drainD1Buffer(baseEnv({ DB: db }));
+
+    expect(res.success).toBe(false);
+    expect(res.processed).toBe(2);
+    expect(res.error).toContain("cleanup failed");
+    expect(res.error).toContain("duplicates");
+    // No silent retry loop: the run stops and surfaces the inconsistency.
+    expect(selectAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("loops until the buffer is empty", async () => {
+    const { db } = makeDb([[makeRow(1)], [makeRow(2)], []]);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    const res = await drainD1Buffer(baseEnv({ DB: db }));
+
+    expect(res).toEqual({ processed: 2, batches: 2, success: true, hasMore: false });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops at maxBatches and flags that more events are pending", async () => {
+    const { db } = makeDb([[makeRow(1)], [makeRow(2)], [makeRow(3)]]);
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+
+    const res = await drainD1Buffer(baseEnv({ DB: db }), 500, 2);
+
+    expect(res).toEqual({ processed: 2, batches: 2, success: true, hasMore: true });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts the ClickHouse request when it hangs", async () => {
+    vi.useFakeTimers();
+    const { db } = makeDb([[makeRow(9)]]);
+
+    vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+      return new Promise((_resolve, reject) => {
+        const signal = (init as RequestInit).signal;
+        signal?.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+    });
+
+    const pending = drainD1Buffer(baseEnv({ DB: db }));
+    await vi.advanceTimersByTimeAsync(5_100);
+    const res = await pending;
+
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("timed out");
+  });
+
+  it("fails cleanly when the D1 read itself errors", async () => {
+    const { db } = makeDb([], { selectError: new Error("D1 unavailable") });
+
+    const res = await drainD1Buffer(baseEnv({ DB: db }));
+
+    expect(res.success).toBe(false);
+    expect(res.error).toContain("D1 buffer read failed");
   });
 });
