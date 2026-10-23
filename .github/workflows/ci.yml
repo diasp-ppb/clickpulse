@@ -5,6 +5,10 @@ on:
     branches: ["main"]
     paths:
       - "packages/**"
+      - "tests/**"
+      - "schema.sql"
+      - "dashboards/**"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - "vitest.config.mts"
@@ -12,6 +16,10 @@ on:
   pull_request:
     paths:
       - "packages/**"
+      - "tests/**"
+      - "schema.sql"
+      - "dashboards/**"
+      - "scripts/**"
       - "package.json"
       - "package-lock.json"
       - "vitest.config.mts"

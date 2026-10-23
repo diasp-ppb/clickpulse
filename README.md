@@ -181,16 +181,18 @@ LIMIT 30;
 
 ### 2. Bounce Rate (% of Sessions with Only 1 Pageview)
 ```sql
-SELECT 
-    round(countIf(hits = 1) * 100.0 / count(), 2) AS bounce_rate_pct
+SELECT
+    if(count() = 0, 0, round(countIf(pageviews = 1) * 100.0 / count(), 2)) AS bounce_rate_pct
 FROM (
-    SELECT session_id, count() AS hits
-    FROM clickpulse.analytics_events
-    WHERE site_id = 'my-website' AND event_type = 'pageview'
-      AND created_at >= now() - INTERVAL 7 DAY
-    GROUP BY session_id
+    SELECT session_id, sum(pageviews) AS pageviews
+    FROM clickpulse.daily_session_stats
+    WHERE site_id = 'my-website'
+      AND date >= today() - 7
+    GROUP BY site_id, session_id
 );
 ```
+> Backed by the `daily_session_stats` materialized view. Run
+> `scripts/backfill-materialized-views.sql` once to populate historical data.
 
 ### 3. Top Outbound Conversions & Partner Clicks
 ```sql
@@ -215,6 +217,10 @@ Run the production DDL in your ClickHouse cluster to create the database, tables
 ```bash
 clickhouse-client < schema.sql
 ```
+
+> Upgrading a deployment that already has data? Materialized views only capture
+> new inserts. Run `scripts/backfill-materialized-views.sql` once so historical
+> dashboard ranges are populated.
 
 ### Step 2: Deploy the Edge Ingestion Worker
 Navigate to the edge worker directory, configure your environment secrets, and deploy to Cloudflare:
@@ -300,6 +306,9 @@ clickpulse/
 ├── docs/                 # Architectural Decision Records (ADRs) & Query Cookbooks
 │   ├── adr/
 │   └── clickhouse-queries.md
+├── scripts/
+│   └── backfill-materialized-views.sql  # One-off MV backfill for existing deployments
+├── tests/                # Cross-artifact checks (schema.sql ↔ dashboards)
 ├── schema.sql            # ClickHouse production DDL & sandboxed user profiles
 └── README.md
 ```

@@ -161,8 +161,17 @@ GROUP BY site_id, date, channel, utm_source, utm_medium, utm_campaign;
 
 -- ----------------------------------------------------------------------------
 -- 6. Daily Session Stats Materialized View (Hyper-fast Bounce Rate & Duration)
--- Pre-aggregates hits, start time, and end time per session.
+-- Pre-aggregates pageviews, start time, and end time per session.
 -- Enables instant bounce rate and session duration calculations across any date range.
+--
+-- NOTE: A materialized view only captures rows inserted after it is created.
+--       Run scripts/backfill-materialized-views.sql to populate historical data.
+-- NOTE: Background merges collapse rows that share (site_id, date, session_id),
+--       so visitor_id is arbitrary for sessions that span UTC midnight (the
+--       daily salt rotates and changes visitor_id). Always aggregate by
+--       session_id before computing bounce rate or session duration.
+-- NOTE: This MV adds a fourth GROUP BY to every insert batch. Under the 50 MB
+--       edge_ingest_limits profile, verify memory headroom before high-traffic rollout.
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS clickpulse.daily_session_stats
 (
@@ -170,7 +179,7 @@ CREATE TABLE IF NOT EXISTS clickpulse.daily_session_stats
     site_id          LowCardinality(String),
     session_id       UUID,
     visitor_id       FixedString(64),
-    hits             SimpleAggregateFunction(sum, UInt32),
+    pageviews        SimpleAggregateFunction(sum, UInt64),
     first_seen       SimpleAggregateFunction(min, DateTime64(3, 'UTC')),
     last_seen        SimpleAggregateFunction(max, DateTime64(3, 'UTC'))
 )
@@ -187,7 +196,7 @@ SELECT
     site_id,
     session_id,
     visitor_id,
-    count() AS hits,
+    toUInt64(count()) AS pageviews,
     min(created_at) AS first_seen,
     max(created_at) AS last_seen
 FROM clickpulse.analytics_events
