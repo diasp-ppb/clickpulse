@@ -175,7 +175,9 @@ LIMIT 25;
 
 ---
 
-## 9. Average Session Duration
+## 9. Average Session Duration (Raw Table)
+
+Pre-aggregated equivalent: [§11.D](#d-instant-bounce-rate--average-session-duration-from-daily_session_stats).
 
 ```sql
 SELECT
@@ -188,9 +190,10 @@ FROM
         dateDiff('second', min(created_at), max(created_at)) AS session_duration_seconds
     FROM clickpulse.analytics_events
     WHERE site_id = 'example.com'
+      AND event_type = 'pageview'
       AND created_at >= now() - INTERVAL 30 DAY
     GROUP BY session_id
-    HAVING count() > 1 -- Exclude 1-hit bounce sessions for accurate duration
+    HAVING count() > 1 -- Exclude 1-pageview bounce sessions for accurate duration
 );
 ```
 
@@ -214,9 +217,9 @@ LIMIT 20;
 
 ---
 
-## 11. Hyper-Fast Materialized View Queries (>100x Speedup)
+## 11. Pre-Aggregated Materialized View Queries
 
-When scaling to tens of millions of events, querying `clickpulse.analytics_events` requires full column scans. The pre-aggregated materialized views reduce latency from seconds to **< 5ms** by reading pre-merged states.
+When scaling to tens of millions of events, querying `clickpulse.analytics_events` requires full column scans. These recipes read pre-merged states instead of raw events, so their cost scales with the number of days/sessions rather than with the number of pageviews.
 
 ### A. Instant KPI Overview (from `daily_site_stats`)
 ```sql
@@ -274,7 +277,11 @@ SELECT
     countIf(total_pageviews = 1) AS bounced_sessions,
     if(count() = 0, 0, round(countIf(total_pageviews = 1) * 100.0 / count(), 2)) AS bounce_rate_pct,
     -- Exclude single-pageview sessions: they have zero duration by definition.
-    round(avgIf(duration_seconds, total_pageviews > 1), 1) AS avg_duration_seconds
+    if(
+        countIf(total_pageviews > 1) = 0,
+        0,
+        round(avgIf(duration_seconds, total_pageviews > 1), 1)
+    ) AS avg_duration_seconds
 FROM
 (
     SELECT

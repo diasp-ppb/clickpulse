@@ -166,10 +166,8 @@ GROUP BY site_id, date, channel, utm_source, utm_medium, utm_campaign;
 --
 -- NOTE: A materialized view only captures rows inserted after it is created.
 --       Run scripts/backfill-materialized-views.sql to populate historical data.
--- NOTE: Background merges collapse rows that share (site_id, date, session_id),
---       so visitor_id is arbitrary for sessions that span UTC midnight (the
---       daily salt rotates and changes visitor_id). Always aggregate by
---       session_id before computing bounce rate or session duration.
+-- NOTE: A session that spans UTC midnight produces one row per date. Always
+--       aggregate by session_id before computing bounce rate or session duration.
 -- NOTE: This MV adds a fourth GROUP BY to every insert batch. Under the 50 MB
 --       edge_ingest_limits profile, verify memory headroom before high-traffic rollout.
 -- ----------------------------------------------------------------------------
@@ -178,7 +176,6 @@ CREATE TABLE IF NOT EXISTS clickpulse.daily_session_stats
     date             Date,
     site_id          LowCardinality(String),
     session_id       UUID,
-    visitor_id       FixedString(64),
     pageviews        SimpleAggregateFunction(sum, UInt64),
     first_seen       SimpleAggregateFunction(min, DateTime64(3, 'UTC')),
     last_seen        SimpleAggregateFunction(max, DateTime64(3, 'UTC'))
@@ -195,13 +192,12 @@ SELECT
     toDate(created_at) AS date,
     site_id,
     session_id,
-    visitor_id,
     toUInt64(count()) AS pageviews,
     min(created_at) AS first_seen,
     max(created_at) AS last_seen
 FROM clickpulse.analytics_events
 WHERE event_type = 'pageview'
-GROUP BY site_id, date, session_id, visitor_id;
+GROUP BY site_id, date, session_id;
 
 -- ----------------------------------------------------------------------------
 -- 7. SigNoz OTLP Integration (Real-Time Ingestion Bridge)

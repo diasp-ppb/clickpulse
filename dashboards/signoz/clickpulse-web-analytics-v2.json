@@ -175,7 +175,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT uniqMerge(visitors_state) AS value, now() AS ts FROM clickpulse.daily_site_stats WHERE site_id IN $site_id AND date >= toDate($start_datetime) AND date <= toDate($end_datetime)",
+                          "query": "SELECT uniqMerge(visitors_state) AS value, now() AS ts FROM clickpulse.daily_site_stats WHERE site_id IN $site_id AND date >= toDate(parseDateTimeBestEffort($start_datetime)) AND date <= toDate(parseDateTimeBestEffort($end_datetime))",
                           "disabled": false,
                           "legend": "Visitors"
                         }
@@ -229,7 +229,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT uniqMerge(sessions_state) AS value, now() AS ts FROM clickpulse.daily_site_stats WHERE site_id IN $site_id AND date >= toDate($start_datetime) AND date <= toDate($end_datetime)",
+                          "query": "SELECT uniqMerge(sessions_state) AS value, now() AS ts FROM clickpulse.daily_site_stats WHERE site_id IN $site_id AND date >= toDate(parseDateTimeBestEffort($start_datetime)) AND date <= toDate(parseDateTimeBestEffort($end_datetime))",
                           "disabled": false,
                           "legend": "Sessions"
                         }
@@ -283,7 +283,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT sum(pageviews) AS value, now() AS ts FROM clickpulse.daily_site_stats WHERE site_id IN $site_id AND date >= toDate($start_datetime) AND date <= toDate($end_datetime)",
+                          "query": "SELECT sum(pageviews) AS value, now() AS ts FROM clickpulse.daily_site_stats WHERE site_id IN $site_id AND date >= toDate(parseDateTimeBestEffort($start_datetime)) AND date <= toDate(parseDateTimeBestEffort($end_datetime))",
                           "disabled": false,
                           "legend": "Pageviews"
                         }
@@ -337,7 +337,7 @@
                         "type": "clickhouse_sql",
                         "spec": {
                           "name": "A",
-                          "query": "SELECT if(count() = 0, 0, round(countIf(pageviews = 1) * 100.0 / count(), 1)) AS value, now() AS ts FROM (SELECT session_id, sum(pageviews) AS pageviews FROM clickpulse.daily_session_stats WHERE site_id IN $site_id AND date >= toDate($start_datetime) AND date <= toDate($end_datetime) GROUP BY session_id)",
+                          "query": "SELECT if(count() = 0, 0, round(countIf(pageviews = 1) * 100.0 / count(), 1)) AS value, now() AS ts FROM (SELECT session_id, sum(pageviews) AS pageviews FROM clickpulse.daily_session_stats WHERE site_id IN $site_id AND date >= toDate(parseDateTimeBestEffort($start_datetime)) AND date <= toDate(parseDateTimeBestEffort($end_datetime)) GROUP BY session_id)",
                           "disabled": false,
                           "legend": "Bounce Rate"
                         }

@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "npm --workspace=@clickpulse/tracker run build",
-    "typecheck": "npm --workspaces run typecheck",
+    "typecheck": "npm --workspaces run typecheck && tsc --noEmit -p tsconfig.tests.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"

@@ -28,7 +28,9 @@ function collectSql(node: unknown, acc: string[] = []): string[] {
   return acc;
 }
 
-const schema = read("schema.sql");
+// Strip SQL line comments so the commented-out SigNoz bridge MV is not parsed.
+const schema = read("schema.sql").replace(/^\s*--.*$/gm, "");
+const backfill = read("scripts/backfill-materialized-views.sql");
 
 const tables = new Set(
   [...schema.matchAll(/CREATE TABLE IF NOT EXISTS clickpulse\.(\w+)/g)].map(
@@ -39,6 +41,37 @@ const tables = new Set(
 const mvTargets = [
   ...schema.matchAll(/TO clickpulse\.(\w+)/g)
 ].map((match) => match[1]);
+
+function tableColumns(table: string): string[] {
+  const match = schema.match(
+    new RegExp(
+      `CREATE TABLE IF NOT EXISTS clickpulse\\.${table}\\s*\\(([\\s\\S]*?)\\)\\s*ENGINE`
+    )
+  );
+  if (!match) return [];
+  return match[1]
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split(/\s+/)[0])
+    .filter((column) => /^\w+$/.test(column));
+}
+
+function mvBody(table: string): string {
+  const match = schema.match(
+    new RegExp(
+      `CREATE MATERIALIZED VIEW IF NOT EXISTS clickpulse\\.\\w+\\s+TO clickpulse\\.${table}\\s+AS([\\s\\S]*?);`
+    )
+  );
+  return match ? match[1] : "";
+}
+
+function backfillBody(table: string): string {
+  const match = backfill.match(
+    new RegExp(`INSERT INTO clickpulse\\.${table}\\s+SELECT([\\s\\S]*?);`)
+  );
+  return match ? match[1] : "";
+}
 
 const dashboardFiles = [
   "dashboards/grafana/web-analytics-dashboard.json",
@@ -58,6 +91,31 @@ describe("Schema artifacts", () => {
     expect(mvTargets.length).toBeGreaterThan(0);
     for (const target of mvTargets) {
       expect(tables.has(target), `MV target ${target} is not defined`).toBe(true);
+    }
+  });
+
+  it("keeps MV and backfill SELECTs aligned with the target table columns", () => {
+    for (const target of new Set(mvTargets)) {
+      const columns = tableColumns(target);
+      const mv = mvBody(target);
+      const insert = backfillBody(target);
+
+      expect(columns.length, `no columns parsed for ${target}`).toBeGreaterThan(
+        0
+      );
+      expect(mv, `no materialized view found for ${target}`).not.toBe("");
+      expect(insert, `no backfill INSERT found for ${target}`).not.toBe("");
+
+      for (const column of columns) {
+        expect(
+          mv,
+          `${target}.${column} is missing from the materialized view`
+        ).toMatch(new RegExp(`\\b${column}\\b`));
+        expect(
+          insert,
+          `${target}.${column} is missing from the backfill script`
+        ).toMatch(new RegExp(`\\b${column}\\b`));
+      }
     }
   });
 
@@ -97,8 +155,15 @@ describe("Schema artifacts", () => {
         }
       });
 
-      it("uses $__dateFilter for Date columns instead of $__timeFilter", () => {
+      it("filters daily tables with $__dateFilter, never $__timeFilter(date)", () => {
         for (const query of queries) {
+          if (!query.includes("clickpulse.daily_") || !query.includes("$__")) {
+            continue;
+          }
+          expect(
+            query,
+            `${file} must use $__dateFilter for Date columns`
+          ).toMatch(/\$__dateFilter\(/);
           expect(query).not.toMatch(/\$__timeFilter\(\s*date\s*\)/);
         }
       });

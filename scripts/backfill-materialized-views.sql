@@ -7,12 +7,16 @@
 -- for historical date ranges.
 --
 -- Order of operations (existing deployments):
---   1. Capture the UTC timestamp BEFORE deploying schema.sql:
+--   1. Pause the edge worker and drain the D1 spool. Events replayed after the
+--      cutoff have an old `created_at`, so they would be counted twice (once
+--      by the MV on insert, once by this backfill).
+--   2. Capture the UTC timestamp while ingestion is paused:
 --        SELECT now();
---   2. Deploy schema.sql (tables + materialized views).
---   3. Replace every `__MV_CREATED_AT__` below with the timestamp from step 1.
---   4. Run this script once, as an admin user (NOT the edge ingest user).
---   5. Run the verification queries at the bottom of this file.
+--   3. Deploy schema.sql (tables + materialized views).
+--   4. Replace every `__MV_CREATED_AT__` below with the timestamp from step 2.
+--   5. Run this script once, as an admin user (NOT the edge ingest user).
+--   6. Run the verification queries at the bottom of this file.
+--   7. Resume the edge worker.
 --
 -- WARNING: do not run twice. The `sum` columns (pageviews, session_starts) are
 -- additive, so a second run double-counts them. `uniq` states are idempotent.
@@ -89,14 +93,13 @@ SELECT
     toDate(created_at) AS date,
     site_id,
     session_id,
-    visitor_id,
     toUInt64(count()) AS pageviews,
     min(created_at) AS first_seen,
     max(created_at) AS last_seen
 FROM clickpulse.analytics_events
 WHERE event_type = 'pageview'
   AND created_at < toDateTime64('__MV_CREATED_AT__', 3, 'UTC')
-GROUP BY site_id, date, session_id, visitor_id;
+GROUP BY site_id, date, session_id;
 
 
 -- ============================================================================
@@ -109,4 +112,29 @@ GROUP BY site_id, date, session_id, visitor_id;
 -- UNION ALL
 -- SELECT 'mv', sum(pageviews), uniqMerge(sessions_state)
 -- FROM clickpulse.daily_site_stats
+-- WHERE site_id = 'example.com' AND date = '2026-01-01';
+
+-- SELECT 'raw' AS source, count() AS session_starts
+-- FROM clickpulse.analytics_events
+-- WHERE site_id = 'example.com' AND visitParamExtractBool(event_data, 'is_new_session') = 1
+--   AND toDate(created_at) = '2026-01-01'
+-- UNION ALL
+-- SELECT 'mv', sum(session_starts)
+-- FROM clickpulse.daily_landing_pages
+-- WHERE site_id = 'example.com' AND date = '2026-01-01';
+
+-- SELECT 'raw' AS source, count() AS pageviews
+-- FROM clickpulse.analytics_events
+-- WHERE site_id = 'example.com' AND event_type = 'pageview' AND toDate(created_at) = '2026-01-01'
+-- UNION ALL
+-- SELECT 'mv', sum(pageviews)
+-- FROM clickpulse.daily_sources
+-- WHERE site_id = 'example.com' AND date = '2026-01-01';
+
+-- SELECT 'raw' AS source, uniq(session_id) AS sessions, count() AS pageviews
+-- FROM clickpulse.analytics_events
+-- WHERE site_id = 'example.com' AND event_type = 'pageview' AND toDate(created_at) = '2026-01-01'
+-- UNION ALL
+-- SELECT 'mv', count(), sum(pageviews)
+-- FROM clickpulse.daily_session_stats
 -- WHERE site_id = 'example.com' AND date = '2026-01-01';

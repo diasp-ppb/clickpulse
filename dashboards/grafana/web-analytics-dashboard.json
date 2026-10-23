@@ -12,6 +12,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "id": 1,
       "title": "Unique Visitors",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_site_stats).",
       "type": "stat",
       "targets": [
         {
@@ -25,6 +26,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "id": 2,
       "title": "Sessions",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_site_stats).",
       "type": "stat",
       "targets": [
         {
@@ -38,6 +40,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "id": 3,
       "title": "Pageviews",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_site_stats).",
       "type": "stat",
       "targets": [
         {
@@ -51,6 +54,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
       "id": 4,
       "title": "Bounce Rate %",
+      "description": "Day granularity: sessions are grouped across dates; the range is rounded outward to full UTC days (daily_session_stats).",
       "type": "stat",
       "targets": [
         {
@@ -77,6 +81,7 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
       "id": 6,
       "title": "Top Landing Pages (Session Starts)",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_landing_pages).",
       "type": "table",
       "targets": [
         {
@@ -90,6 +95,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
       "id": 7,
       "title": "Top Acquisition Channels",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_sources).",
       "type": "table",
       "targets": [
         {
@@ -103,6 +109,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
       "id": 8,
       "title": "Top UTM Campaigns",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_sources).",
       "type": "table",
       "targets": [
         {
@@ -124,6 +131,7 @@
       }
     ]
   },
+  "timezone": "utc",
   "time": { "from": "now-7d", "to": "now" },
   "title": "ClickPulse — Web Analytics",
   "uid": "clickpulse-overview"
