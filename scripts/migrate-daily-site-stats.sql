@@ -10,17 +10,21 @@
 -- the last batch (observed in production as ~1 pageview/day). `uniq` states are
 -- unaffected. This script rebuilds the table from analytics_events.
 --
--- Order of operations:
---   1. Deploy schema.sql (it creates the new tables/views; IF NOT EXISTS leaves
---      the legacy daily_site_stats untouched).
---   2. Pause the edge worker (and drain the D1 spool) to avoid a write gap.
---   3. Capture the cutoff while ingestion is paused:
+-- Order of operations (existing deployments):
+--   1. Pause the edge worker (and drain the D1 spool) to avoid a write gap.
+--   2. Capture the cutoff while ingestion is paused:
 --        SELECT now();
---   4. Replace every `__CUTOFF__` below with that timestamp.
---   5. Run this script once as an admin user (NOT the edge ingest user).
+--   3. Replace every `__CUTOFF__` below with that timestamp.
+--   4. Run this script once as an admin user (NOT the edge ingest user). It
+--      fixes and rebuilds daily_site_stats and recreates its materialized view.
+--   5. Run schema.sql to create the remaining new tables/views. Do this AFTER
+--      the migration: schema.sql defines daily_site_stats_mv with
+--      session_starts, and the legacy table does not have that column yet.
 --   6. Run scripts/backfill-materialized-views.sql but SKIP section 1
 --      (daily_site_stats was already rebuilt here).
 --   7. Resume the edge worker and run the verification queries at the bottom.
+--
+-- Fresh deployments: run schema.sql only; this script is not needed.
 --
 -- WARNING: this script TRUNCATES clickpulse.daily_site_stats and rebuilds it
 -- from raw events (18-month raw retention). Do not run it twice.
@@ -47,7 +51,7 @@ SELECT
     toDate(created_at) AS date,
     site_id,
     toUInt64(count()) AS pageviews,
-    toUInt64(countIf(visitParamExtractBool(event_data, 'is_new_session') = 1)) AS session_starts,
+    toUInt64(countIf(JSONExtractBool(event_data, 'is_new_session') = 1)) AS session_starts,
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
 FROM clickpulse.analytics_events
@@ -60,7 +64,7 @@ SELECT
     toDate(created_at) AS date,
     site_id,
     toUInt64(count()) AS pageviews,
-    toUInt64(countIf(visitParamExtractBool(event_data, 'is_new_session') = 1)) AS session_starts,
+    toUInt64(countIf(JSONExtractBool(event_data, 'is_new_session') = 1)) AS session_starts,
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
 FROM clickpulse.analytics_events
@@ -73,7 +77,7 @@ GROUP BY site_id, date;
 -- Replace 2026-01-01 with a day that exists in your dataset.
 -- ============================================================================
 -- SELECT 'raw' AS source, count() AS pageviews, uniq(session_id) AS sessions,
---        countIf(visitParamExtractBool(event_data, 'is_new_session') = 1) AS session_starts
+--        countIf(JSONExtractBool(event_data, 'is_new_session') = 1) AS session_starts
 -- FROM clickpulse.analytics_events
 -- WHERE site_id = 'example.com' AND event_type = 'pageview' AND toDate(created_at) = '2026-01-01'
 -- UNION ALL

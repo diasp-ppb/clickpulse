@@ -142,6 +142,17 @@ describe("Schema artifacts", () => {
     }
   });
 
+  it("reads is_new_session with JSONExtractBool, not visitParamExtractBool", () => {
+    // visitParamExtractBool is whitespace-sensitive and misses numeric 1;
+    // the tracker emits both {"is_new_session":true} and {"is_new_session":1}.
+    for (const source of [schema, backfill, migration]) {
+      expect(source).not.toMatch(/visitParamExtractBool/);
+    }
+    expect(read("docs/clickhouse-queries.md")).not.toMatch(
+      /visitParamExtractBool/
+    );
+  });
+
   it("uses explicit column lists in every script INSERT", () => {
     for (const script of [backfill, migration]) {
       for (const match of script.matchAll(

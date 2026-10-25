@@ -222,7 +222,8 @@ clickhouse-client < schema.sql
 > new inserts. Run `scripts/backfill-materialized-views.sql` once so historical
 > dashboard ranges are populated. If `daily_site_stats` predates the
 > `SimpleAggregateFunction` fix, run `scripts/migrate-daily-site-stats.sql`
-> first — its old `pageviews UInt64` column does not aggregate correctly.
+> **before** `schema.sql` — its old `pageviews UInt64` column does not aggregate
+> correctly, and the new view definition needs `session_starts` to exist.
 
 ### Step 2: Deploy the Edge Ingestion Worker
 Navigate to the edge worker directory, configure your environment secrets, and deploy to Cloudflare:

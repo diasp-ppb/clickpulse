@@ -208,7 +208,7 @@ SELECT
     uniq(session_id) AS unique_sessions
 FROM clickpulse.analytics_events
 WHERE site_id = 'example.com'
-  AND visitParamExtractBool(event_data, 'is_new_session') = 1
+  AND JSONExtractBool(event_data, 'is_new_session') = 1
   AND created_at >= now() - INTERVAL 30 DAY
 GROUP BY landing_page
 ORDER BY session_starts DESC

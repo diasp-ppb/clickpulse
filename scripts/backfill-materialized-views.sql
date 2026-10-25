@@ -40,7 +40,7 @@ SELECT
     toDate(created_at) AS date,
     site_id,
     toUInt64(count()) AS pageviews,
-    toUInt64(countIf(visitParamExtractBool(event_data, 'is_new_session') = 1)) AS session_starts,
+    toUInt64(countIf(JSONExtractBool(event_data, 'is_new_session') = 1)) AS session_starts,
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
 FROM clickpulse.analytics_events
@@ -60,7 +60,7 @@ SELECT
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
 FROM clickpulse.analytics_events
-WHERE visitParamExtractBool(event_data, 'is_new_session') = 1
+WHERE JSONExtractBool(event_data, 'is_new_session') = 1
   AND created_at < toDateTime64('__MV_CREATED_AT__', 3, 'UTC')
 GROUP BY site_id, date, path;
 
@@ -85,7 +85,7 @@ SELECT
     utm_source,
     utm_medium,
     utm_campaign,
-    toUInt64(countIf(visitParamExtractBool(event_data, 'is_new_session') = 1)) AS session_starts,
+    toUInt64(countIf(JSONExtractBool(event_data, 'is_new_session') = 1)) AS session_starts,
     toUInt64(count()) AS pageviews,
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
@@ -125,7 +125,7 @@ GROUP BY site_id, date, session_id;
 
 -- SELECT 'raw' AS source, count() AS session_starts
 -- FROM clickpulse.analytics_events
--- WHERE site_id = 'example.com' AND visitParamExtractBool(event_data, 'is_new_session') = 1
+-- WHERE site_id = 'example.com' AND JSONExtractBool(event_data, 'is_new_session') = 1
 --   AND toDate(created_at) = '2026-01-01'
 -- UNION ALL
 -- SELECT 'mv', sum(session_starts)
