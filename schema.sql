@@ -72,7 +72,7 @@ SELECT
     toDate(created_at) AS date,
     site_id,
     count() AS pageviews,
-    countIf(visitParamExtractBool(event_data, 'is_new_session') = 1) AS session_starts,
+    countIf(JSONExtractBool(event_data, 'is_new_session') = 1) AS session_starts,
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
 FROM clickpulse.analytics_events
@@ -107,7 +107,7 @@ SELECT
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
 FROM clickpulse.analytics_events
-WHERE visitParamExtractBool(event_data, 'is_new_session') = 1
+WHERE JSONExtractBool(event_data, 'is_new_session') = 1
 GROUP BY site_id, date, path;
 
 -- ----------------------------------------------------------------------------
@@ -151,7 +151,7 @@ SELECT
     utm_source,
     utm_medium,
     utm_campaign,
-    countIf(visitParamExtractBool(event_data, 'is_new_session') = 1) AS session_starts,
+    countIf(JSONExtractBool(event_data, 'is_new_session') = 1) AS session_starts,
     count() AS pageviews,
     uniqState(visitor_id) AS visitors_state,
     uniqState(session_id) AS sessions_state
@@ -160,7 +160,47 @@ WHERE event_type = 'pageview'
 GROUP BY site_id, date, channel, utm_source, utm_medium, utm_campaign;
 
 -- ----------------------------------------------------------------------------
--- 6. SigNoz OTLP Integration (Real-Time Ingestion Bridge)
+-- 6. Daily Session Stats Materialized View (Hyper-fast Bounce Rate & Duration)
+-- Pre-aggregates pageviews, start time, and end time per session.
+-- Enables instant bounce rate and session duration calculations across any date range.
+--
+-- NOTE: A materialized view only captures rows inserted after it is created.
+--       Run scripts/backfill-materialized-views.sql to populate historical data.
+-- NOTE: A session that spans UTC midnight produces one row per date. Always
+--       aggregate by session_id before computing bounce rate or session duration.
+-- NOTE: This MV adds a fourth GROUP BY to every insert batch. Under the 50 MB
+--       edge_ingest_limits profile, verify memory headroom before high-traffic rollout.
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clickpulse.daily_session_stats
+(
+    date             Date,
+    site_id          LowCardinality(String),
+    session_id       UUID,
+    pageviews        SimpleAggregateFunction(sum, UInt64),
+    first_seen       SimpleAggregateFunction(min, DateTime64(3, 'UTC')),
+    last_seen        SimpleAggregateFunction(max, DateTime64(3, 'UTC'))
+)
+ENGINE = AggregatingMergeTree()
+PARTITION BY toYYYYMM(date)
+ORDER BY (site_id, date, session_id)
+TTL date + INTERVAL 36 MONTH;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS clickpulse.daily_session_stats_mv
+TO clickpulse.daily_session_stats
+AS
+SELECT
+    toDate(created_at) AS date,
+    site_id,
+    session_id,
+    toUInt64(count()) AS pageviews,
+    min(created_at) AS first_seen,
+    max(created_at) AS last_seen
+FROM clickpulse.analytics_events
+WHERE event_type = 'pageview'
+GROUP BY site_id, date, session_id;
+
+-- ----------------------------------------------------------------------------
+-- 7. SigNoz OTLP Integration (Real-Time Ingestion Bridge)
 -- If sending OTLP logs directly to SigNoz (/v1/logs), this Materialized View
 -- automatically streams incoming 'clickpulse' logs from SigNoz's log store
 -- into clickpulse.analytics_events with flat, typed columns in real-time.
@@ -188,7 +228,7 @@ GROUP BY site_id, date, channel, utm_source, utm_medium, utm_campaign;
 --    OR resources_string_value[indexOf(resources_string_key, 'service.name')] = 'clickpulse';
 
 -- ----------------------------------------------------------------------------
--- 5. Database Hardening & Sandboxed User (Zero-Trust Security)
+-- 8. Database Hardening & Sandboxed User (Zero-Trust Security)
 -- Protects ClickHouse from connection spikes, memory exhaustion, and unauthorized reads.
 -- ----------------------------------------------------------------------------
 

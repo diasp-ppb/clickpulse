@@ -12,10 +12,11 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "id": 1,
       "title": "Unique Visitors",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_site_stats).",
       "type": "stat",
       "targets": [
         {
-          "rawSql": "SELECT uniq(visitor_id) FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at)",
+          "rawSql": "SELECT uniqMerge(visitors_state) FROM clickpulse.daily_site_stats WHERE site_id = '$site_id' AND $__dateFilter(date)",
           "refId": "A"
         }
       ]
@@ -25,10 +26,11 @@
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "id": 2,
       "title": "Sessions",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_site_stats).",
       "type": "stat",
       "targets": [
         {
-          "rawSql": "SELECT uniq(session_id) FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at)",
+          "rawSql": "SELECT uniqMerge(sessions_state) FROM clickpulse.daily_site_stats WHERE site_id = '$site_id' AND $__dateFilter(date)",
           "refId": "A"
         }
       ]
@@ -38,10 +40,11 @@
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "id": 3,
       "title": "Pageviews",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_site_stats).",
       "type": "stat",
       "targets": [
         {
-          "rawSql": "SELECT count() FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at)",
+          "rawSql": "SELECT sum(pageviews) FROM clickpulse.daily_site_stats WHERE site_id = '$site_id' AND $__dateFilter(date)",
           "refId": "A"
         }
       ]
@@ -51,10 +54,11 @@
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
       "id": 4,
       "title": "Bounce Rate %",
+      "description": "Day granularity: sessions are grouped across dates; the range is rounded outward to full UTC days (daily_session_stats).",
       "type": "stat",
       "targets": [
         {
-          "rawSql": "SELECT round(countIf(hits = 1) * 100.0 / count(), 1) FROM (SELECT session_id, count() AS hits FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND event_type = 'pageview' AND $__timeFilter(created_at) GROUP BY session_id)",
+          "rawSql": "SELECT if(count() = 0, 0, round(countIf(pageviews = 1) * 100.0 / count(), 1)) FROM (SELECT session_id, sum(pageviews) AS pageviews FROM clickpulse.daily_session_stats WHERE site_id = '$site_id' AND $__dateFilter(date) GROUP BY session_id)",
           "refId": "A"
         }
       ]
@@ -77,10 +81,39 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
       "id": 6,
       "title": "Top Landing Pages (Session Starts)",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_landing_pages).",
       "type": "table",
       "targets": [
         {
-          "rawSql": "SELECT path AS landing_page, count() AS session_starts, uniq(session_id) AS unique_sessions FROM clickpulse.analytics_events WHERE site_id = '$site_id' AND visitParamExtractBool(event_data, 'is_new_session') = 1 AND $__timeFilter(created_at) GROUP BY path ORDER BY session_starts DESC LIMIT 15",
+          "rawSql": "SELECT path AS landing_page, sum(session_starts) AS session_starts, uniqMerge(sessions_state) AS unique_sessions FROM clickpulse.daily_landing_pages WHERE site_id = '$site_id' AND $__dateFilter(date) GROUP BY path ORDER BY session_starts DESC LIMIT 15",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "id": 7,
+      "title": "Top Acquisition Channels",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_sources).",
+      "type": "table",
+      "targets": [
+        {
+          "rawSql": "SELECT channel, sum(pageviews) AS pageviews, uniqMerge(sessions_state) AS sessions FROM clickpulse.daily_sources WHERE site_id = '$site_id' AND $__dateFilter(date) GROUP BY channel ORDER BY sessions DESC LIMIT 10",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "id": 8,
+      "title": "Top UTM Campaigns",
+      "description": "Day granularity: the selected range is rounded outward to full UTC days (daily_sources).",
+      "type": "table",
+      "targets": [
+        {
+          "rawSql": "SELECT concat(utm_source, ' / ', utm_medium) AS source_medium, utm_campaign, sum(pageviews) AS pageviews, uniqMerge(sessions_state) AS sessions FROM clickpulse.daily_sources WHERE site_id = '$site_id' AND utm_source != '' AND $__dateFilter(date) GROUP BY source_medium, utm_campaign ORDER BY sessions DESC LIMIT 10",
           "refId": "A"
         }
       ]
@@ -98,6 +131,7 @@
       }
     ]
   },
+  "timezone": "utc",
   "time": { "from": "now-7d", "to": "now" },
   "title": "ClickPulse — Web Analytics",
   "uid": "clickpulse-overview"

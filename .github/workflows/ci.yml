@@ -5,16 +5,30 @@ on:
     branches: ["main"]
     paths:
       - "packages/**"
+      - "tests/**"
+      - "schema.sql"
+      - "dashboards/**"
+      - "scripts/**"
+      - "docs/**"
+      - "README.md"
       - "package.json"
       - "package-lock.json"
       - "vitest.config.mts"
+      - "tsconfig.tests.json"
       - ".github/workflows/ci.yml"
   pull_request:
     paths:
       - "packages/**"
+      - "tests/**"
+      - "schema.sql"
+      - "dashboards/**"
+      - "scripts/**"
+      - "docs/**"
+      - "README.md"
       - "package.json"
       - "package-lock.json"
       - "vitest.config.mts"
+      - "tsconfig.tests.json"
       - ".github/workflows/ci.yml"
 
 # Automatically cancel obsolete workflow runs when new commits are pushed
