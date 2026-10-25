@@ -6,6 +6,11 @@
 -- this script once, otherwise dashboards backed by the MVs will show zeros
 -- for historical date ranges.
 --
+-- Deployments created before the `SimpleAggregateFunction` fix must run
+-- scripts/migrate-daily-site-stats.sql FIRST (it rebuilds daily_site_stats,
+-- whose old plain UInt64 column does not sum correctly), and then SKIP
+-- section 1 below: the migration already rebuilt that table.
+--
 -- Order of operations (existing deployments):
 --   1. Pause the edge worker and drain the D1 spool. Events replayed after the
 --      cutoff have an old `created_at`, so they would be counted twice (once
@@ -30,6 +35,7 @@
 
 -- 1. Daily site stats --------------------------------------------------------
 INSERT INTO clickpulse.daily_site_stats
+    (date, site_id, pageviews, session_starts, visitors_state, sessions_state)
 SELECT
     toDate(created_at) AS date,
     site_id,
@@ -45,6 +51,7 @@ GROUP BY site_id, date;
 
 -- 2. Daily landing pages -----------------------------------------------------
 INSERT INTO clickpulse.daily_landing_pages
+    (date, site_id, path, session_starts, visitors_state, sessions_state)
 SELECT
     toDate(created_at) AS date,
     site_id,
@@ -60,6 +67,7 @@ GROUP BY site_id, date, path;
 
 -- 3. Daily acquisition channels ---------------------------------------------
 INSERT INTO clickpulse.daily_sources
+    (date, site_id, channel, utm_source, utm_medium, utm_campaign, session_starts, pageviews, visitors_state, sessions_state)
 SELECT
     toDate(created_at) AS date,
     site_id,
@@ -89,6 +97,7 @@ GROUP BY site_id, date, channel, utm_source, utm_medium, utm_campaign;
 
 -- 4. Daily session stats -----------------------------------------------------
 INSERT INTO clickpulse.daily_session_stats
+    (date, site_id, session_id, pageviews, first_seen, last_seen)
 SELECT
     toDate(created_at) AS date,
     site_id,

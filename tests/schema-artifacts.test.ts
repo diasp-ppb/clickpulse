@@ -31,6 +31,7 @@ function collectSql(node: unknown, acc: string[] = []): string[] {
 // Strip SQL line comments so the commented-out SigNoz bridge MV is not parsed.
 const schema = read("schema.sql").replace(/^\s*--.*$/gm, "");
 const backfill = read("scripts/backfill-materialized-views.sql");
+const migration = read("scripts/migrate-daily-site-stats.sql");
 
 const tables = new Set(
   [...schema.matchAll(/CREATE TABLE IF NOT EXISTS clickpulse\.(\w+)/g)].map(
@@ -68,9 +69,23 @@ function mvBody(table: string): string {
 
 function backfillBody(table: string): string {
   const match = backfill.match(
-    new RegExp(`INSERT INTO clickpulse\\.${table}\\s+SELECT([\\s\\S]*?);`)
+    new RegExp(
+      `INSERT INTO clickpulse\\.${table}\\s*(?:\\([^)]*\\)\\s*)?SELECT([\\s\\S]*?);`
+    )
   );
   return match ? match[1] : "";
+}
+
+function backfillColumns(table: string): string[] {
+  const match = backfill.match(
+    new RegExp(`INSERT INTO clickpulse\\.${table}\\s*\\(([^)]*)\\)`)
+  );
+  return match
+    ? match[1]
+        .split(",")
+        .map((column) => column.trim())
+        .filter(Boolean)
+    : [];
 }
 
 const dashboardFiles = [
@@ -115,6 +130,27 @@ describe("Schema artifacts", () => {
           insert,
           `${target}.${column} is missing from the backfill script`
         ).toMatch(new RegExp(`\\b${column}\\b`));
+      }
+
+      // ALTER TABLE ... ADD COLUMN appends at the end, so positional INSERTs
+      // break after a migration. Require an explicit, complete column list.
+      const listed = backfillColumns(target);
+      expect(
+        [...listed].sort(),
+        `backfill INSERT for ${target} must list every column`
+      ).toEqual([...columns].sort());
+    }
+  });
+
+  it("uses explicit column lists in every script INSERT", () => {
+    for (const script of [backfill, migration]) {
+      for (const match of script.matchAll(
+        /INSERT INTO clickpulse\.(\w+)\s*(\([^)]*\))?/g
+      )) {
+        expect(
+          match[2],
+          `INSERT into ${match[1]} must list its columns explicitly`
+        ).toBeTruthy();
       }
     }
   });

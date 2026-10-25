@@ -220,7 +220,9 @@ clickhouse-client < schema.sql
 
 > Upgrading a deployment that already has data? Materialized views only capture
 > new inserts. Run `scripts/backfill-materialized-views.sql` once so historical
-> dashboard ranges are populated.
+> dashboard ranges are populated. If `daily_site_stats` predates the
+> `SimpleAggregateFunction` fix, run `scripts/migrate-daily-site-stats.sql`
+> first — its old `pageviews UInt64` column does not aggregate correctly.
 
 ### Step 2: Deploy the Edge Ingestion Worker
 Navigate to the edge worker directory, configure your environment secrets, and deploy to Cloudflare:
@@ -307,7 +309,8 @@ clickpulse/
 │   ├── adr/
 │   └── clickhouse-queries.md
 ├── scripts/
-│   └── backfill-materialized-views.sql  # One-off MV backfill for existing deployments
+│   ├── backfill-materialized-views.sql  # One-off MV backfill for existing deployments
+│   └── migrate-daily-site-stats.sql     # Rebuild pre-SimpleAggregateFunction rollups
 ├── tests/                # Cross-artifact checks (schema.sql ↔ dashboards)
 ├── schema.sql            # ClickHouse production DDL & sandboxed user profiles
 └── README.md
