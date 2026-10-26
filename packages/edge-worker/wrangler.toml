@@ -40,3 +40,12 @@ CLICKHOUSE_TABLE = "analytics_events"
 # ------------------------------------------------------------------------------
 # OTEL_EXPORTER_OTLP_ENDPOINT = "https://collector.yourdomain.com"
 # OTEL_AUTH_TOKEN = ""
+
+# ------------------------------------------------------------------------------
+# Automated Shock Absorber Drain: Cron Trigger (Flushes D1 buffer to ClickHouse)
+# Requires the [[d1_databases]] binding above to be enabled.
+# Drain inserts use wait_for_async_insert=1: spooled rows are deleted only after
+# ClickHouse acknowledges persistence (at-least-once delivery).
+# ------------------------------------------------------------------------------
+# [triggers]
+# crons = ["*/10 * * * *"]

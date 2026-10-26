@@ -12,25 +12,10 @@ import { validateAndSanitize } from "./schema";
 import { computeVisitorId } from "./hash";
 import { sendDirectToClickHouse } from "./clickhouse";
 import { sendOtlpLog } from "./otlp";
+import { drainD1Buffer } from "./drain";
+import type { Env } from "./env";
 
-export interface Env {
-  DB?: D1Database;
-  SALT_SECRET?: string;
-  ALLOWED_ORIGINS?: string;
-
-  // Direct Protected ClickHouse Ingestion (Primary)
-  CLICKHOUSE_ENDPOINT?: string; // e.g., "https://clickhouse.yourdomain.com"
-  CLICKHOUSE_USER?: string; // e.g., "clickpulse_worker"
-  CLICKHOUSE_PASSWORD?: string;
-  CLICKHOUSE_DATABASE?: string; // Defaults to "clickpulse"
-  CLICKHOUSE_TABLE?: string; // Defaults to "analytics_events"
-  CF_ACCESS_CLIENT_ID?: string; // Cloudflare Access Zero Trust Service Token ID
-  CF_ACCESS_CLIENT_SECRET?: string; // Cloudflare Access Zero Trust Service Token Secret
-
-  // Optional OpenTelemetry Collector Mode
-  OTEL_EXPORTER_OTLP_ENDPOINT?: string; // e.g., "https://collector.yourdomain.com"
-  OTEL_AUTH_TOKEN?: string;
-}
+export type { Env };
 
 function resolveOrigin(request: Request): string | null {
   const origin = request.headers.get("Origin");
@@ -245,6 +230,27 @@ export default {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders }
       });
+    }
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    const result = await drainD1Buffer(env);
+
+    if (!result.success) {
+      console.error(
+        `D1 automated drain failed after ${result.batches} batch(es), ${result.processed} event(s) flushed: ${result.error}`
+      );
+      return;
+    }
+
+    if (result.processed > 0) {
+      console.log(
+        `D1 automated drain: ${result.processed} events flushed to ClickHouse in ${result.batches} batch(es).`
+      );
+    }
+
+    if (result.hasMore) {
+      console.warn("D1 automated drain: buffer still has pending events, next cron run will continue.");
     }
   }
 };

@@ -81,7 +81,7 @@ flowchart TD
 1. **Protected Direct Mode (Recommended / Primary):**  
    The Edge Worker posts flat, typed JSON rows directly to ClickHouse HTTP API using **`async_insert=1`** and **`wait_for_async_insert=0`**. ClickHouse buffers writes in server RAM and flushes atomic batches to disk. The connection is shielded via Cloudflare Access Service Tokens and an `INSERT`-only user capped at 50 MB RAM.
 2. **Shock Absorber Fallback (D1 Spool):**  
-   If ClickHouse is rebooting, under maintenance, or latency exceeds 800ms, the worker automatically spools events to Cloudflare D1. Zero data is dropped during infrastructure outages.
+   If ClickHouse is rebooting, under maintenance, or latency exceeds 800ms, the worker automatically spools events to Cloudflare D1. Zero data is dropped during infrastructure outages. Buffered events are drained back into ClickHouse either by the optional in-worker cron (`scheduled()` handler, every 10 min) or by the `sync-cli` ETL worker. The cron drain uses **`wait_for_async_insert=1`** so rows are only removed from D1 after ClickHouse confirms persistence.
 3. **OpenTelemetry Mode (Optional):**  
    For teams that prefer routing through an existing OpenTelemetry Collector, the worker can output standard OTLP logs (`/v1/logs`).
 
