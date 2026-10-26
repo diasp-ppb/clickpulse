@@ -56,13 +56,48 @@ var ClickPulse = (function (exports) {
     return () => document.removeEventListener("click", handleClick);
   }
 
+  // src/spa.ts
+  function registerSpaListener(onNavigate) {
+    if (typeof window === "undefined" || !window.history) {
+      return () => {
+      };
+    }
+    let lastPath = location.pathname + location.search;
+    const check = () => {
+      const path = location.pathname;
+      const cur = path + location.search;
+      if (cur !== lastPath) {
+        lastPath = cur;
+        onNavigate(path);
+      }
+    };
+    const origPush = history.pushState;
+    const origReplace = history.replaceState;
+    history.pushState = function(...args) {
+      origPush.apply(this, args);
+      check();
+    };
+    history.replaceState = function(...args) {
+      origReplace.apply(this, args);
+      check();
+    };
+    window.addEventListener("popstate", check);
+    return () => {
+      history.pushState = origPush;
+      history.replaceState = origReplace;
+      window.removeEventListener("popstate", check);
+    };
+  }
+
   // src/index.ts
   var defaultTracker = null;
   function init(config) {
     defaultTracker?.destroy();
     const c = { autoPageview: true, trackOutbound: true, ...config };
-    let off;
-    const trackFn = (eventType, data) => {
+    const trackSpa = config.trackSpa ?? c.autoPageview;
+    const cleanups = [];
+    let alive = true;
+    const trackFn = (eventType, data, path) => {
       try {
         const { sessionId, isNewSession } = getOrCreateSessionId(c.sessionTimeoutMs);
         const urlParams = new URLSearchParams(location.search);
@@ -70,7 +105,7 @@ var ClickPulse = (function (exports) {
           site_id: c.siteId,
           session_id: sessionId,
           event: eventType.slice(0, 50),
-          path: location.pathname.slice(0, 255),
+          path: (path ?? location.pathname).slice(0, 255),
           referrer: document.referrer.slice(0, 500) || null,
           ts: Date.now()
         };
@@ -89,22 +124,36 @@ var ClickPulse = (function (exports) {
       } catch {
       }
     };
-    const pageviewFn = (title) => {
-      trackFn("pageview", { title: title || document.title });
+    const pageviewFn = (title, path) => {
+      trackFn("pageview", { title: title || document.title }, path);
     };
     if (c.autoPageview) {
       pageviewFn();
     }
+    if (trackSpa) {
+      cleanups.push(
+        registerSpaListener((path) => {
+          setTimeout(() => {
+            if (alive) pageviewFn(void 0, path);
+          }, 0);
+        })
+      );
+    }
     if (c.trackOutbound) {
-      off = registerOutboundClickListener(
-        (outbound) => trackFn("outbound_click", outbound),
-        c.outboundDomains
+      cleanups.push(
+        registerOutboundClickListener(
+          (outbound) => trackFn("outbound_click", outbound),
+          c.outboundDomains
+        )
       );
     }
     return defaultTracker = {
-      track: trackFn,
-      pageview: pageviewFn,
-      destroy: () => off?.()
+      track: (eventType, data) => trackFn(eventType, data),
+      pageview: (title) => pageviewFn(title),
+      destroy: () => {
+        alive = false;
+        cleanups.forEach((fn) => fn());
+      }
     };
   }
   function track(eventType, data) {
@@ -116,7 +165,11 @@ var ClickPulse = (function (exports) {
   if (typeof document !== "undefined") {
     const d = document.currentScript?.dataset;
     if (d?.site) {
-      const run = () => init({ siteId: d.site, endpoint: d.endpoint || "/api/analytics" });
+      const run = () => init({
+        siteId: d.site,
+        endpoint: d.endpoint || "/api/analytics",
+        trackSpa: d.spa !== "false"
+      });
       document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run, { once: true }) : run();
     }
   }
